@@ -38,6 +38,9 @@ public class LoginController {
     		return this.userService.byNameTenant(loginName, tenantId);
     }
     
+	public User getUserById(Long id) {
+		return this.userService.byId(id);
+	}
     
     public void createSessionRequest(String assertionId, String relayState) {
         SessionRequest req = new SessionRequest();

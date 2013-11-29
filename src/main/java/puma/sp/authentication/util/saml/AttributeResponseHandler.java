@@ -4,7 +4,6 @@
  */
 package puma.sp.authentication.util.saml;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,7 +18,7 @@ import org.opensaml.saml2.core.Response;
 import org.opensaml.xml.XMLObject;
 import org.opensaml.xml.schema.XSString;
 
-import puma.sp.mgmt.model.attribute.AttributeType;
+import puma.sp.mgmt.model.attribute.AttributeFamily;
 import puma.util.exceptions.flow.ResponseProcessingException;
 import puma.util.exceptions.saml.ElementProcessingException;
 import puma.util.exceptions.saml.ServiceParameterException;
@@ -31,18 +30,18 @@ import puma.util.saml.SAMLHelper;
  */
 public class AttributeResponseHandler {
 	private static Logger logger = Logger.getLogger(AttributeResponseHandler.class.getCanonicalName());
-    private Set<AttributeType> attributes;
-    public AttributeResponseHandler(Set<AttributeType> types) {
+    private Set<AttributeFamily> attributes;
+    public AttributeResponseHandler(Set<AttributeFamily> types) {
         SAMLHelper.initialize();
         this.attributes = types;
         // DEBUG
-        for (AttributeType type: types)
+        for (AttributeFamily type: types)
         	logger.log(Level.INFO, "Required attributetype: " + type.getName());
         // /DEBUG
     }
     
-    public Map<String, Serializable> interpret(String message) throws ResponseProcessingException, ServiceParameterException, ElementProcessingException {
-        Map<String, Serializable> result = new HashMap<String, Serializable>(); // TODO Cache this data, and also store the condition's NotOnOrAfter.
+    public Map<String, List<String>> interpret(String message) throws ResponseProcessingException, ServiceParameterException, ElementProcessingException {
+        Map<String, List<String>> result = new HashMap<String, List<String>>(); // TODO Cache this data, and also store the condition's NotOnOrAfter.
         logger.log(Level.INFO, message);
         Response response = SAMLHelper.processString(message, Response.class);
         SAMLHelper.verifyResponse(response);
@@ -63,12 +62,12 @@ public class AttributeResponseHandler {
                             	logger.log(Level.INFO, "Found attribute as " + attribute.getName() + "=" + ((XSString) next).getValue());
                                 values.add(((XSString) next).getValue());
                             }
-                            result.put(attribute.getName(), (Serializable) values);
+                            result.put(attribute.getName(), values);
                         } else {
                             List<String> values = new ArrayList<String>();
                             values.add(((XSString) attribute.getAttributeValues().get(0)).getValue());
                         	logger.log(Level.INFO, "Found one attribute as " + attribute.getName() + "=" + ((XSString) attribute.getAttributeValues().get(0)).getValue());
-                            result.put(attribute.getName(), (Serializable) values);
+                            result.put(attribute.getName(), values);
                         }
                     }
                 }

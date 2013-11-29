@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package puma.sp.authentication.servlets;
 
 import java.io.IOException;
@@ -53,7 +49,7 @@ public class AuthenticationRequestServlet extends HttpServlet {
             if (tenant == null) {
             	throw new FlowException("No tenant could be identified in the authentication process");
             }
-            if (tenant.isLocallyManaged()) {
+            if (tenant.isAuthenticationLocallyManaged()) {
         		request.getSession().setAttribute("FlowRedirectionElement", new FlowDirecter("/AuthenticationResponseServlet"));
             	response.sendRedirect("login.jsf");
         		return;

@@ -15,8 +15,8 @@ import org.opensaml.xml.io.Marshaller;
 import org.opensaml.xml.io.MarshallingException;
 import org.opensaml.xml.util.XMLHelper;
 import org.w3c.dom.Element;
-import puma.sp.mgmt.model.attribute.AttributeType;
 import puma.sp.mgmt.model.organization.Tenant;
+import puma.sp.mgmt.model.attribute.AttributeFamily;
 import puma.util.saml.SAMLHelper;
 import puma.util.saml.elements.AttributeFactory;
 import puma.util.saml.elements.CustomProxyExtensionFactory;
@@ -34,9 +34,9 @@ public class AttributeRequestHandler extends AssertableHandler {
 	private static Logger logger = Logger.getLogger(AttributeRequestHandler.class.getCanonicalName());
     private Tenant tenant;
     private String subject;
-    private Set<AttributeType> attributes;
+    private Set<AttributeFamily> attributes;
     
-    public AttributeRequestHandler(Set<AttributeType> attributes, String subject, Tenant requestingTenantParty) {
+    public AttributeRequestHandler(Set<AttributeFamily> attributes, String subject, Tenant requestingTenantParty) {
         super();
         this.tenant = requestingTenantParty;
         this.subject = subject;
@@ -64,7 +64,7 @@ public class AttributeRequestHandler extends AssertableHandler {
     
     public AttributeQuery buildRequest() {
         AttributeQueryFactory factory = new AttributeQueryFactory(this.getAssertionId(), (new SubjectFactory(this.subject)).produce(), this.tenant.getAttrRequestEndpoint(), (new IssuerFactory(AuthenticationRequestHandler.SP_NAME)).produce());
-        for (AttributeType attribute: this.attributes) {
+        for (AttributeFamily attribute: this.attributes) {
             factory.addFactory(new AttributeFactory(attribute.getName()));
         }
         return (factory.produce());        
