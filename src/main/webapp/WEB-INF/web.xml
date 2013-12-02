@@ -26,4 +26,30 @@
         <url-pattern>/initialize</url-pattern>
     </servlet-mapping>
     
+    <servlet>
+        <servlet-name>AuthenticationRequestServlet</servlet-name>
+        <servlet-class>puma.sp.authentication.servlets.AuthenticationRequestServlet</servlet-class>
+    </servlet>    
+    <servlet-mapping>
+        <servlet-name>AuthenticationRequestServlet</servlet-name>
+        <url-pattern>/AuthenticationRequestServlet</url-pattern>
+    </servlet-mapping>
+    
+    <servlet>
+        <servlet-name>AuthenticationResponseServlet</servlet-name>
+        <servlet-class>puma.sp.authentication.servlets.AuthenticationResponseServlet</servlet-class>
+    </servlet>    
+    <servlet-mapping>
+        <servlet-name>AuthenticationResponseServlet</servlet-name>
+        <url-pattern>/AuthenticationResponseServlet</url-pattern>
+    </servlet-mapping>
+    
+    <servlet>
+        <servlet-name>ServiceAccessServlet</servlet-name>
+        <servlet-class>puma.sp.authentication.servlets.ServiceAccessServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>ServiceAccessServlet</servlet-name>
+        <url-pattern>/ServiceAccessServlet</url-pattern>
+    </servlet-mapping>
 </web-app>

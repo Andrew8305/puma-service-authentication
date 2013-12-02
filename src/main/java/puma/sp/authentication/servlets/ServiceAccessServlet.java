@@ -53,7 +53,7 @@ public class ServiceAccessServlet extends HttpServlet {
             	tenantIdentifier = (String) request.getParameter("Tenant");
             	if (tenantIdentifier == null || tenantIdentifier.isEmpty()) {
             		request.getSession().setAttribute("FlowRedirectionElement", new FlowDirecter("/ServiceAccessServlet"));
-            		response.sendRedirect("index.jsp");
+            		response.sendRedirect("");
             		return;
             	} else {
             		tenantObject = wayfCtrl.getTenant(Long.parseLong(tenantIdentifier));
@@ -64,7 +64,7 @@ public class ServiceAccessServlet extends HttpServlet {
             }
             if (tenantObject == null) {
         		request.getSession().setAttribute("FlowRedirectionElement", new FlowDirecter("/ServiceAccessServlet"));
-        		response.sendRedirect("index.jsp");
+        		response.sendRedirect("");
         		return;
             } else {
             	request.getSession().setAttribute("Tenant", tenantObject);
