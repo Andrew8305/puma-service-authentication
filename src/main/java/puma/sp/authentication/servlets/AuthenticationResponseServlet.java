@@ -124,6 +124,7 @@ public class AuthenticationResponseServlet extends HttpServlet {
 						parameters.add(new String(key + "=" + nextValue));
 				}
         	}
+        	logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName());
         	for (String next: parameters)
         		if (redirectURL.indexOf("?") >= 0)
         			redirectURL = redirectURL + "&" + next;

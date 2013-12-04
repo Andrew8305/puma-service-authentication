@@ -16,7 +16,7 @@
 		<url-pattern>/</url-pattern>
 	</servlet-mapping>
 	
-	
+	<!-- 
     <servlet>
         <servlet-name>InitServlet</servlet-name>
         <servlet-class>puma.sp.authentication.servlets.population.InitializationServlet</servlet-class>
@@ -52,4 +52,5 @@
         <servlet-name>ServiceAccessServlet</servlet-name>
         <url-pattern>/ServiceAccessServlet</url-pattern>
     </servlet-mapping>
+     -->
 </web-app>

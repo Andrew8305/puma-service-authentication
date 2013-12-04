@@ -1,5 +1,8 @@
 package puma.sp.authentication.controllers;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import puma.sp.mgmt.repositories.user.SessionRequestService;
@@ -14,6 +17,7 @@ import puma.util.PasswordHasher;
  */
 @Controller
 public class LoginController {
+	private static Logger logger = Logger.getLogger(LoginController.class.getCanonicalName());
 	@Autowired
 	private UserService userService;
 	@Autowired

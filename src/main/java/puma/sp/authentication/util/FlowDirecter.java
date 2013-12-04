@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class FlowDirecter {
-	private static String REDIRECT_URL = "redirect:/";
+	private static String REDIRECT_URL = "redirect:";
 	protected String address;
 	protected Map<String, Object> attributes;
 	

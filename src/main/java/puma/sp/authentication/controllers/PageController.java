@@ -51,14 +51,15 @@ public class PageController {
     	Tenant selectedTenant = this.retrieveTenant(tenantId);
 		directer = (FlowDirecter) session.getAttribute("FlowRedirectionElement");
 		if (selectedTenant == null) {
-			directer = new FlowDirecter("wayfError");
+			directer = new FlowDirecter("/wayfError");
 			MessageManager.getInstance().addMessage(session, "info", "You will be authenticating as a free user");
 		}
     	if (directer == null) {
-    		directer = new FlowDirecter("login");
+    		directer = new FlowDirecter("/login");
     	}
     	directer.addAttribute("Tenant", selectedTenant);
     	session.setAttribute("Tenant", selectedTenant);
+    	logger.log(Level.INFO, "Selected tenant " + selectedTenant.getName() + "(" + ((Tenant) session.getAttribute("Tenant")).getId() + ") with flow direction " + directer.redirectionPage());
 		return directer.redirectionPage();
 	}
 	
@@ -104,9 +105,10 @@ public class PageController {
     	FlowDirecter directer = (FlowDirecter) session.getAttribute("FlowRedirectionElement");
     	if (directer == null) {
     		// TODO Waarnaar gaan we hier redirecten? Uiteindelijk heeft de gebruiker hier nu juist een lokale sessie in PUMA gecreeerd, maar waarnaar moet er dan geredirect worden? Error page? 
-    		directer = new FlowDirecter("index");
+    		directer = new FlowDirecter("/index");
     	}
     	directer.addAttribute("SubjectIdentifier", relevantUser.getId().toString());
+    	session.setAttribute("SubjectIdentifier", relevantUser.getId().toString());
 		return directer.redirectionPage();
 	}
 }
