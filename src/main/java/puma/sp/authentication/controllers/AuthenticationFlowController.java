@@ -23,6 +23,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import puma.sp.authentication.clients.AttributeForwardImplService;
 import puma.sp.authentication.clients.AttributeForwardService;
+import puma.sp.authentication.messages.MessageManager;
 import puma.sp.authentication.servlets.AuthenticationRequestServlet;
 import puma.sp.authentication.util.FlowDirecter;
 import puma.sp.authentication.util.saml.AttributeRequestHandler;
@@ -49,9 +50,6 @@ import puma.util.exceptions.saml.ServiceParameterException;
 
 @Controller
 public class AuthenticationFlowController {
-	// TODO Dit spring-ifyen. Helaas verwacht de SAML library HTTPServletRequest/Response objecten, hoe worden deze aangegeven? ==> Lange baan
-    public static String ERROR_LOCATION = "http://ERROR_PAGE"; // FIXME Deze moet nog aangegeven worden
-    public static String LOGIN_LOCATION = "login"; // FIXME Deze moet nog aangegeven worden
     
 	private static Logger logger = Logger.getLogger(AuthenticationRequestServlet.class.getCanonicalName());
 	@Autowired
@@ -86,15 +84,19 @@ public class AuthenticationFlowController {
             }        	 
         } catch (MessageEncodingException e) {  
         	logger.log(Level.SEVERE, e.getMessage(), e);
-			return ERROR_LOCATION;
+        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not set up SAML message. Please retry and contact the administrator if this problem occurs again.");
+        	return "report";
         } catch (RequestConstructionException e) {
         	logger.log(Level.SEVERE, e.getMessage(), e);
-			return ERROR_LOCATION;
+        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not set up SAML message. Please retry and contact the administrator if this problem occurs again.");
+        	return "report";
         } catch (FlowException e) {
         	logger.log(Level.SEVERE, e.getMessage(), e);  
-			return ERROR_LOCATION;
+        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + e.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
+        	return "report";
 		}
-		return ERROR_LOCATION;		
+    	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process the request. Please retry and contact the administrator if this problem occurs again.");
+    	return "report";	
 	}
 
 	@RequestMapping(value = "/AuthenticationResponseServlet", method = RequestMethod.GET)
@@ -135,83 +137,95 @@ public class AuthenticationFlowController {
 		        		session.setAttribute("SubjectIdentifier", subjectIdentifier);
 		        	}
 		        	subject = this.userService.byId(Long.parseLong(subjectIdentifier));
-		        	// Store the alias for the current subject in the database
-		        	// MAYBE Generate a cookie which indicates that the user has authenticated (should only hold for the current session) and the PUMA-specific session attributes 
-		        	// Redirect back to the relay state, include the alias
-		        	String redirectURL = removeTrailingSlash(new String(relayState));
-		        	List<String> parameters = new ArrayList<String>();
-		        	if (subject == null)
-		        		throw new ResponseProcessingException("Could not find a user with identifier " + subjectIdentifier);
-		        	parameters.add(new String("UserId=" + subjectIdentifier));
-		        	// QUESTION J->M: Die authentication locally managed, wat zie jij daar precies onder? Want bij de Tenant staat er een nogal vreemde OR-clausule voor de context waarin ik het denk
-		        	if (tenant.isAuthenticationLocallyManaged()) {
-			        	parameters.add(new String("Name=" + subject.getLoginName()));
-			        	if (subject.getAttribute("Email").isEmpty())
-			        		throw new ResponseProcessingException("Could not find an email-address for the given user " + subject.getId());
-			        	parameters.add(new String("Email=" + subject.getAttribute("Email").get(0).getValue()));
-			        	parameters.add(new String("Tenant=" + tenant.getId()));
-			        	for (Attribute next: subject.getAttribute("Role"))
-			        		parameters.add(new String("Role=" + next.getValue()));
+		        	if (relayState != null && !relayState.isEmpty()) {
+			        	// If a relay state was given, redirect back to the relay state, include the alias
+			        	String redirectURL = removeTrailingSlash(new String(relayState));
+			        	List<String> parameters = new ArrayList<String>();
+			        	if (subject == null)
+			        		throw new ResponseProcessingException("Could not find a user with identifier " + subjectIdentifier);
+			        	parameters.add(new String("UserId=" + subjectIdentifier));
+			        	// QUESTION J->M: Die authentication locally managed, wat zie jij daar precies onder? Want bij de Tenant staat er een nogal vreemde OR-clausule voor de context waarin ik het denk
+			        	if (tenant.isAuthenticationLocallyManaged()) {
+				        	parameters.add(new String("Name=" + subject.getLoginName()));
+				        	if (subject.getAttribute("Email").isEmpty())
+				        		throw new ResponseProcessingException("Could not find an email-address for the given user " + subject.getId());
+				        	parameters.add(new String("Email=" + subject.getAttribute("Email").get(0).getValue()));
+				        	parameters.add(new String("Tenant=" + tenant.getId()));
+				        	for (Attribute next: subject.getAttribute("Role"))
+				        		parameters.add(new String("Role=" + next.getValue()));
+			        	} else {
+			        		Set<AttributeFamily> requestedAttributes = new HashSet<AttributeFamily>(4);
+			        		AttributeFamily ptr;
+			        		ptr = new AttributeFamily();
+			        		ptr.setName("Name");
+			        		requestedAttributes.add(ptr);
+			        		ptr = new AttributeFamily();
+			        		ptr.setName("Email");
+			        		requestedAttributes.add(ptr);
+			        		ptr = new AttributeFamily();
+			        		ptr.setName("Tenant");
+			        		requestedAttributes.add(ptr);
+			        		ptr = new AttributeFamily();
+			        		ptr.setName("Role");
+			        		requestedAttributes.add(ptr);
+			        		AttributeRequestHandler handler = new AttributeRequestHandler(requestedAttributes, subjectIdentifier, tenant);
+							String samlAttrRequest = handler.prepareResponse(null, handler.buildRequest());
+							/// Retrieve result of message
+							AttributeResponseHandler responseHandler = new AttributeResponseHandler(requestedAttributes);
+							String reply = send(samlAttrRequest); // Performs the actual request
+							Map<String, List<String>> attributes = responseHandler.interpret(reply);
+							for (String key : attributes.keySet()) {
+								List<String> next = attributes.get(key);
+								for (String nextValue: next)
+									parameters.add(new String(key + "=" + nextValue));
+							}
+			        	}
+			        	for (String next: parameters)
+			        		if (redirectURL.indexOf("?") >= 0)
+			        			redirectURL = redirectURL + "&" + next;
+			        		else
+			        			redirectURL = redirectURL + "?" + next;
+			        	logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName() + ". Redirecting to " + redirectURL);
+			        	session.removeAttribute("RelayState");
+			        	session.setAttribute("Authenticated", true);
+			        	return "redirect:" + redirectURL;
 		        	} else {
-		        		Set<AttributeFamily> requestedAttributes = new HashSet<AttributeFamily>(4);
-		        		AttributeFamily ptr;
-		        		ptr = new AttributeFamily();
-		        		ptr.setName("Name");
-		        		requestedAttributes.add(ptr);
-		        		ptr = new AttributeFamily();
-		        		ptr.setName("Email");
-		        		requestedAttributes.add(ptr);
-		        		ptr = new AttributeFamily();
-		        		ptr.setName("Tenant");
-		        		requestedAttributes.add(ptr);
-		        		ptr = new AttributeFamily();
-		        		ptr.setName("Role");
-		        		requestedAttributes.add(ptr);
-		        		AttributeRequestHandler handler = new AttributeRequestHandler(requestedAttributes, subjectIdentifier, tenant);
-						String samlAttrRequest = handler.prepareResponse(null, handler.buildRequest());
-						/// Retrieve result of message
-						AttributeResponseHandler responseHandler = new AttributeResponseHandler(requestedAttributes);
-						String reply = send(samlAttrRequest); // Performs the actual request
-						Map<String, List<String>> attributes = responseHandler.interpret(reply);
-						for (String key : attributes.keySet()) {
-							List<String> next = attributes.get(key);
-							for (String nextValue: next)
-								parameters.add(new String(key + "=" + nextValue));
-						}
+		        		// if no relay state was given, show an info page that the user has now an active session and can access services that use this authentication service as a verifier
+		        		MessageManager.getInstance().addMessage(session, "success", "You have successfully logged in. You can now use any of the applications that use this service as an authentication service.");
+		        		return "report";
 		        	}
-		        	for (String next: parameters)
-		        		if (redirectURL.indexOf("?") >= 0)
-		        			redirectURL = redirectURL + "&" + next;
-		        		else
-		        			redirectURL = redirectURL + "?" + next;
-		        	logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName() + ". Redirecting to " + redirectURL);
-		        	session.removeAttribute("RelayState");
-		        	session.setAttribute("Authenticated", true);
-		        	return "redirect:" + redirectURL;
 		        } catch (MessageDecodingException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
-		        	return "redirect:" + ERROR_LOCATION;
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
+		        	return "report";
 		        } catch (org.opensaml.xml.security.SecurityException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
-		        	return "redirect:" + ERROR_LOCATION;
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
+		        	return "report";
 		        } catch (ResponseProcessingException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
-		        	return "redirect:" + ERROR_LOCATION;
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process the SAML response. Please retry and contact the administrator if this problem occurs again.");
+		        	return "report";
 		        } catch (FlowException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
-		        	return "redirect:" + ERROR_LOCATION;
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + ex.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
+		        	return "report";
 		        } catch (NumberFormatException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
-		        	return "redirect:" + ERROR_LOCATION;
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
+		        	return "report";
 				} catch (MessageEncodingException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
-		        	return "redirect:" + ERROR_LOCATION;
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
+		        	return "report";
 				} catch (ServiceParameterException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
-		        	return "redirect:" + ERROR_LOCATION;
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process SAML response properly. Please retry and contact the administrator if this problem occurs again.");
+		        	return "report";
 				} catch (ElementProcessingException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
-		        	return "redirect:" + ERROR_LOCATION;
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process SAML response properly. Please retry and contact the administrator if this problem occurs again.");
+		        	return "report";
 				}
 	}
 
@@ -252,6 +266,8 @@ public class AuthenticationFlowController {
 	            return "redirect:/AuthenticationRequestServlet";
 			} else {
 				// Subject is already authenticated
+				if (relayState != null && !relayState.isEmpty())
+					session.setAttribute("RelayState", relayState);
 				return "redirect:/AuthenticationResponseServlet";
 			}
         } catch (FlowException ex) {

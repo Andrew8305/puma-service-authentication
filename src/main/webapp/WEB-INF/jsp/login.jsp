@@ -5,6 +5,22 @@
 <jsp:include page="includes/header.jsp" />
 
 <div class="container">
+
+	<div class="row">  
+		<div class="col-md-12">  
+      <h1 class="page-header">Login</h1> 
+    </div>
+	</div>
+
+  <form:form method="post" class="form-signin" action="proc/login">
+    <input type="text" class="form-control" placeholder="Loginname" name="loginName" id="loginName" required autofocus>
+    <input type="password" class="form-control" placeholder="Password" name="password" id="password" required>
+    <button class="btn btn-lg btn-primary btn-block" type="submit">Log in</button>
+  </form:form>
+</div>
+
+<!-- 
+<div class="container">
 	<div style="position: absolute; left: 50%; top: 50%; text-align: center; width:300px; height:265px; margin-left: -150px; margin-top: -132px;">
 		<h1>Login</h1>
 		<form:form method="post" action="proc/login" class="form-horizontal">
@@ -30,5 +46,6 @@
 		</form:form>
 	</div>
 </div>
+-->
 
 <jsp:include page="includes/footer.jsp" />

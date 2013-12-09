@@ -13,7 +13,7 @@
 					<div class="control-group">
 						<form:label cssClass="control-label" path="id">Choose tenant:</form:label>
 						<div class="controls">
-							<select name="tenantId">
+							<select name="tenantId" class="form-control">
 								<c:forEach items="${tenants}" var="tenant">
 									<option value="${tenant.id}">${tenant.name}</option>
 								</c:forEach>
