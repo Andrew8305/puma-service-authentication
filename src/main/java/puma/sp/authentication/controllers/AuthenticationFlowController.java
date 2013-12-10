@@ -148,8 +148,9 @@ public class AuthenticationFlowController {
 			        	if (tenant.isAuthenticationLocallyManaged()) {
 				        	parameters.add(new String("Name=" + subject.getLoginName()));
 				        	if (subject.getAttribute("Email").isEmpty())
-				        		throw new ResponseProcessingException("Could not find an email-address for the given user " + subject.getId());
-				        	parameters.add(new String("Email=" + subject.getAttribute("Email").get(0).getValue()));
+				        		parameters.add(new String("Email="));
+				        	else
+				        		parameters.add(new String("Email=" + subject.getAttribute("Email").get(0).getValue()));
 				        	parameters.add(new String("Tenant=" + tenant.getId()));
 				        	for (Attribute next: subject.getAttribute("Role"))
 				        		parameters.add(new String("Role=" + next.getValue()));
@@ -233,7 +234,7 @@ public class AuthenticationFlowController {
 	public String accessService(
 			@RequestParam(value = "RelayState", defaultValue = "") String relayState,
 			@RequestParam(value = "Tenant", defaultValue = "") String tenantIdentifier,
-			ModelMap model, HttpServletRequest request, HttpSession session) {
+			ModelMap model, HttpSession session) {
 		try {
 			if (session.getAttribute("Authenticated") == null || !((Boolean) session.getAttribute("Authenticated")).booleanValue()) {
 	            // RelayState
@@ -274,6 +275,14 @@ public class AuthenticationFlowController {
         	logger.log(Level.SEVERE, "Unable to process request", ex);
             return "redirect:/";
 		}
+	} 
+	
+	@RequestMapping(value = "/LogoutServlet", method = RequestMethod.GET)
+	public String logout(
+			@RequestParam(value = "RelayState", defaultValue = "") String relayState,
+			ModelMap model, HttpSession session)  {
+		session.invalidate();
+		return "redirect:" + relayState;
 	}
 	
 	private String send(String samlAttrRequest) {
