@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.opensaml.saml2.core.Assertion;
@@ -19,6 +18,7 @@ import org.opensaml.xml.XMLObject;
 import org.opensaml.xml.schema.XSString;
 
 import puma.sp.mgmt.model.attribute.AttributeFamily;
+import puma.util.exceptions.SAMLException;
 import puma.util.exceptions.flow.ResponseProcessingException;
 import puma.util.exceptions.saml.ElementProcessingException;
 import puma.util.exceptions.saml.ServiceParameterException;
@@ -30,8 +30,8 @@ import puma.util.saml.SAMLHelper;
  */
 public class AttributeResponseHandler {
 	private static Logger logger = Logger.getLogger(AttributeResponseHandler.class.getCanonicalName());
-    private Set<AttributeFamily> attributes;
-    public AttributeResponseHandler(Set<AttributeFamily> types) {
+    private List<AttributeFamily> attributes;
+    public AttributeResponseHandler(List<AttributeFamily> types) throws SAMLException {
         SAMLHelper.initialize();
         this.attributes = types;
         // DEBUG
@@ -40,8 +40,8 @@ public class AttributeResponseHandler {
         // /DEBUG
     }
     
-    public Map<String, List<String>> interpret(String message) throws ResponseProcessingException, ServiceParameterException, ElementProcessingException {
-        Map<String, List<String>> result = new HashMap<String, List<String>>(); // TODO Cache this data, and also store the condition's NotOnOrAfter.
+    public Map<String, List<String>> interpret(String message) throws ResponseProcessingException, ServiceParameterException, ElementProcessingException, SAMLException {
+        Map<String, List<String>> result = new HashMap<String, List<String>>(); // LATER Cache this data, and also store the condition's NotOnOrAfter.
         logger.log(Level.INFO, message);
         Response response = SAMLHelper.processString(message, Response.class);
         SAMLHelper.verifyResponse(response);

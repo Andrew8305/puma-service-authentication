@@ -1,5 +1,7 @@
 package puma.sp.authentication.controllers;
 
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -19,8 +21,8 @@ import puma.sp.authentication.util.FlowDirecter;
 import puma.util.PasswordHasher;
 
 @Controller
-public class PageController {
-	private static Logger logger = Logger.getLogger(PageController.class.getCanonicalName());
+public class MainController {
+	private static Logger logger = Logger.getLogger(MainController.class.getCanonicalName());
 	@Autowired
 	private TenantService tenantService;
 	@Autowired
@@ -92,7 +94,20 @@ public class PageController {
 			return "redirect:/login";
 		}
 		// else: check password
-		byte[] theHash = PasswordHasher.getHashValue(password, relevantUser.getPasswordSalt());
+		byte[] theHash;
+		try {
+			theHash = PasswordHasher.getHashValue(password, relevantUser.getPasswordSalt());
+		} catch (NoSuchAlgorithmException e) {
+			logger.log(Level.SEVERE, "Unable to evaluate password", e);
+			MessageManager.getInstance().addMessage(session, "failure", "Could not log in. Please contact your administrator. " + e.getLocalizedMessage());
+			model.addAttribute("msgs", MessageManager.getInstance().getMessages(session));
+			return "report";
+		} catch (InvalidKeySpecException e) {
+			logger.log(Level.SEVERE, "Unable to evaluate password", e);
+			MessageManager.getInstance().addMessage(session, "failure", "Could not log in. Please contact your administrator. " + e.getLocalizedMessage());
+			model.addAttribute("msgs", MessageManager.getInstance().getMessages(session));
+			return "report";
+		}
     	if (!PasswordHasher.equalHash(relevantUser.getPasswordHash(), theHash)) {
 			String tenantName = "NULL";
 			if (tenant != null)
@@ -104,7 +119,6 @@ public class PageController {
     	// else: back to flow
     	FlowDirecter directer = (FlowDirecter) session.getAttribute("FlowRedirectionElement");
     	if (directer == null) {
-    		// TODO Waarnaar gaan we hier redirecten? Uiteindelijk heeft de gebruiker hier nu juist een lokale sessie in PUMA gecreeerd, maar waarnaar moet er dan geredirect worden? Error page? 
     		directer = new FlowDirecter("/index");
     	}
     	directer.addAttribute("SubjectIdentifier", relevantUser.getId().toString());

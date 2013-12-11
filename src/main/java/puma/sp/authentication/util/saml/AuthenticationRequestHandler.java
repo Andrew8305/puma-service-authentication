@@ -1,7 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
 package puma.sp.authentication.util.saml;
 
 import javax.servlet.http.HttpServletResponse;
@@ -13,8 +9,8 @@ import org.opensaml.saml2.metadata.Endpoint;
 import org.opensaml.saml2.metadata.impl.SingleSignOnServiceBuilder;
 import org.opensaml.ws.message.encoder.MessageEncodingException;
 import org.opensaml.ws.transport.http.HttpServletResponseAdapter;
-import puma.sp.authentication.controllers.LoginController;
 import puma.sp.mgmt.model.organization.Tenant;
+import puma.util.exceptions.SAMLException;
 import puma.util.exceptions.flow.RequestConstructionException;
 import puma.util.saml.SAMLHelper;
 import puma.util.saml.elements.CustomProxyExtensionFactory;
@@ -29,9 +25,8 @@ import puma.util.saml.messages.AuthnRequestFactory;
 public class AuthenticationRequestHandler extends AssertableHandler {
     // MAYBE Make a properties file for this
     public final static String SP_NAME = "PUMA Access Control Unit";
-    public final static String SP_ASSERTION_SERVICE_CONSUMER_URL = "http://localhost:8080/PUMA-war/AuthenticationResponseServlet";
+    public final static String SP_ASSERTION_SERVICE_CONSUMER_URL = "http://dnetcloud-tomcat:8080/authn/AuthenticationResponseServlet";
     
-    private LoginController loginService;
     private Tenant tenant;
     private String relayState;
     private String redirectionLocation;
@@ -40,17 +35,16 @@ public class AuthenticationRequestHandler extends AssertableHandler {
         super();
         this.tenant = requestingTenantParty;
         this.relayState = relayState;
-        this.loginService = new LoginController();
         this.redirectionLocation = this.getRedirectionLocation();
     }
     
     private String getRedirectionLocation() throws RequestConstructionException {
-        Tenant redirectionTenant = null;
         if (this.tenant.getAuthnRequestEndpoint() == null || this.tenant.getAuthnRequestEndpoint().isEmpty()) {
             if (this.tenant.getSuperTenant() == null) {
                 throw new RequestConstructionException(this.tenant.getName(), "No endpoint URL given");
             }
-            redirectionTenant = this.tenant;
+            // If the current tenant does not have an authentication redirection endpoint, then fetch one from the first supertenant which does
+            Tenant redirectionTenant = this.tenant;
             while (redirectionTenant.getSuperTenant() != null) {
                 if (redirectionTenant.getAuthnRequestEndpoint() == null || redirectionTenant.getAuthnRequestEndpoint().isEmpty()) {
                     redirectionTenant = redirectionTenant.getSuperTenant();
@@ -64,9 +58,7 @@ public class AuthenticationRequestHandler extends AssertableHandler {
         return this.tenant.getAuthnRequestEndpoint();
     }
     
-    public AuthnRequest buildRequest() {
-        // Save the current session in a temporary DB and perform SAML request
-        this.loginService.createSessionRequest(this.getAssertionId(), this.relayState);
+    public AuthnRequest buildRequest() throws SAMLException {
         // Return the newly built authentication request
         return this.constructAuthnRequest();
     }
@@ -91,7 +83,7 @@ public class AuthenticationRequestHandler extends AssertableHandler {
         encoder.encode(context);
     }
 
-    private AuthnRequest constructAuthnRequest() {        
+    private AuthnRequest constructAuthnRequest() throws SAMLException {        
         SAMLHelper.initialize();
         AuthnRequest result = (new AuthnRequestFactory(this.getAssertionId(), this.redirectionLocation, AuthenticationRequestHandler.SP_NAME, AuthenticationRequestHandler.SP_ASSERTION_SERVICE_CONSUMER_URL)).produce();
         ExtensionsFactory factory = new ExtensionsFactory();

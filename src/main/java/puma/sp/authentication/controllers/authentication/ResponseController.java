@@ -1,16 +1,12 @@
-package puma.sp.authentication.controllers;
+package puma.sp.authentication.controllers.authentication;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-
 import org.opensaml.ws.message.decoder.MessageDecodingException;
 import org.opensaml.ws.message.encoder.MessageEncodingException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,85 +16,37 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
-
-import puma.sp.authentication.clients.AttributeForwardImplService;
-import puma.sp.authentication.clients.AttributeForwardService;
+import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.WebResource;
 import puma.sp.authentication.messages.MessageManager;
-import puma.sp.authentication.servlets.AuthenticationRequestServlet;
-import puma.sp.authentication.util.FlowDirecter;
 import puma.sp.authentication.util.saml.AttributeRequestHandler;
 import puma.sp.authentication.util.saml.AttributeResponseHandler;
-import puma.sp.authentication.util.saml.AuthenticationRequestHandler;
 import puma.sp.authentication.util.saml.AuthenticationResponseHandler;
 import puma.sp.mgmt.model.attribute.Attribute;
 import puma.sp.mgmt.model.attribute.AttributeFamily;
 import puma.sp.mgmt.model.organization.Tenant;
 import puma.sp.mgmt.model.user.User;
 import puma.sp.mgmt.repositories.organization.TenantService;
+import puma.sp.mgmt.repositories.user.SessionRequestService;
 import puma.sp.mgmt.repositories.user.UserService;
+import puma.util.exceptions.SAMLException;
 import puma.util.exceptions.flow.FlowException;
-import puma.util.exceptions.flow.RequestConstructionException;
 import puma.util.exceptions.flow.ResponseProcessingException;
 import puma.util.exceptions.saml.ElementProcessingException;
 import puma.util.exceptions.saml.ServiceParameterException;
 
-/**
- * 
- * @author Jasper Bogaerts
- *
- */
-
 @Controller
-public class AuthenticationFlowController {
-    
-	private static Logger logger = Logger.getLogger(AuthenticationRequestServlet.class.getCanonicalName());
-	@Autowired
-	private UserService userService;
+public class ResponseController {
+	private static Logger logger = Logger.getLogger(ResponseController.class.getCanonicalName());
+	
 	@Autowired 
 	private TenantService tenantService;
+	@Autowired
+	private UserService userService;
+	@Autowired
+	private SessionRequestService sessionService;
 	
-	@RequestMapping(value = "/AuthenticationRequestServlet", method = RequestMethod.GET)
-	public String handleRequest(ModelMap model, HttpServletResponse response,
-			@RequestParam(value = "RelayState", defaultValue = "") String relayState,
-			@RequestParam(value = "Tenant", defaultValue = "") String tenantId, HttpSession session,
-			UriComponentsBuilder builder) {
-		Tenant tenant = null;		
-		try {
-			if (relayState == null || relayState.isEmpty())
-				relayState = (String) session.getAttribute("RelayState");
-			if (tenantId == null || tenantId.isEmpty())
-				tenant = (Tenant) session.getAttribute("Tenant");
-			else
-				tenant = tenantService.findOne(Long.parseLong(tenantId));
-			if (relayState == null)
-                throw new FlowException("No relay state was found in the authentication process");
-            if (tenant == null)
-            	throw new FlowException("No tenant could be identified in the authentication process");
-            
-            if (tenant.isAuthenticationLocallyManaged()) {
-        		session.setAttribute("FlowRedirectionElement", new FlowDirecter("/AuthenticationResponseServlet"));
-        		return "/login";
-            } else {
-            	AuthenticationRequestHandler handler = new AuthenticationRequestHandler(relayState, tenant);
-            	handler.prepareResponse(response, handler.buildRequest());
-            }        	 
-        } catch (MessageEncodingException e) {  
-        	logger.log(Level.SEVERE, e.getMessage(), e);
-        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not set up SAML message. Please retry and contact the administrator if this problem occurs again.");
-        	return "report";
-        } catch (RequestConstructionException e) {
-        	logger.log(Level.SEVERE, e.getMessage(), e);
-        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not set up SAML message. Please retry and contact the administrator if this problem occurs again.");
-        	return "report";
-        } catch (FlowException e) {
-        	logger.log(Level.SEVERE, e.getMessage(), e);  
-        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + e.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
-        	return "report";
-		}
-    	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process the request. Please retry and contact the administrator if this problem occurs again.");
-    	return "report";	
-	}
-
 	@RequestMapping(value = "/AuthenticationResponseServlet", method = RequestMethod.GET)
 	public String handleResponse(ModelMap model, 
 			@RequestParam(value = "RelayState", defaultValue = "") String relayState,
@@ -121,59 +69,56 @@ public class AuthenticationFlowController {
 		        		throw new FlowException("No relay state could be found in the authentication process");
 		        	}
 		        	// Retrieve the identifier for the current subject
-		        	// QUESTION J->M: Die authentication locally managed, wat zie jij daar precies onder? Want bij de Tenant staat er een nogal vreemde OR-clausule voor de context waarin ik het denk
 		        	if (tenant.isAuthenticationLocallyManaged()) {
 		        		subjectIdentifier = (String) session.getAttribute("SubjectIdentifier");
 		        		if (subjectIdentifier == null || subjectIdentifier.isEmpty())
 		        			throw new FlowException("Could not identify the user: null pointer or empty identifier found");
 		        	} else {
 		        		AuthenticationResponseHandler handler = new AuthenticationResponseHandler();
-		        		String redirectionAddress = handler.interpret(request);
+		        		String redirectionAddress = handler.interpret(this.sessionService, request);
 		        		if (!redirectionAddress.equalsIgnoreCase((String) session.getAttribute("RelayState")))
 		        			throw new FlowException("Illegal relay state modification in the process");
 		        		subjectIdentifier = handler.getSubject(request);
 		        		if (subjectIdentifier == null || subjectIdentifier.isEmpty())
 		        			throw new FlowException("Could not identify the user: null pointer or empty identifier found");
 		        		session.setAttribute("SubjectIdentifier", subjectIdentifier);
+		        		logger.log(Level.INFO, "Completed request for subject " + subjectIdentifier + " from tenant " + tenant.getName() + " succesfully. Performing attribute lookup.");
 		        	}
-		        	subject = this.userService.byId(Long.parseLong(subjectIdentifier));
-		        	if (relayState != null && !relayState.isEmpty()) {
+		        	// Process response
+		        	if (relayState != null && !relayState.isEmpty() && !relayState.equalsIgnoreCase(AccessController.DEFAULT_RELAYSTATE)) {
 			        	// If a relay state was given, redirect back to the relay state, include the alias
 			        	String redirectURL = removeTrailingSlash(new String(relayState));
 			        	List<String> parameters = new ArrayList<String>();
-			        	if (subject == null)
-			        		throw new ResponseProcessingException("Could not find a user with identifier " + subjectIdentifier);
+			        	if (subjectIdentifier == null || subjectIdentifier.isEmpty())
+			        		throw new ResponseProcessingException("Could not find a user with null or empty subject identifier. If this problem persists, please ask your administrator to inspect the logs.");
 			        	parameters.add(new String("UserId=" + subjectIdentifier));
-			        	// QUESTION J->M: Die authentication locally managed, wat zie jij daar precies onder? Want bij de Tenant staat er een nogal vreemde OR-clausule voor de context waarin ik het denk
+			        	parameters.add(new String("Tenant=" + tenant.getId()));
 			        	if (tenant.isAuthenticationLocallyManaged()) {
+			        		subject = this.userService.byId(Long.parseLong(subjectIdentifier));
+			        		if (subject == null)
+			        			throw new ResponseProcessingException("Could not find a user with identifier " + subjectIdentifier);
 				        	parameters.add(new String("Name=" + subject.getLoginName()));
 				        	if (subject.getAttribute("Email").isEmpty())
 				        		parameters.add(new String("Email="));
 				        	else
 				        		parameters.add(new String("Email=" + subject.getAttribute("Email").get(0).getValue()));
-				        	parameters.add(new String("Tenant=" + tenant.getId()));
 				        	for (Attribute next: subject.getAttribute("Role"))
 				        		parameters.add(new String("Role=" + next.getValue()));
+					        	logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName() + ". Redirecting to " + redirectURL);
 			        	} else {
-			        		Set<AttributeFamily> requestedAttributes = new HashSet<AttributeFamily>(4);
-			        		AttributeFamily ptr;
-			        		ptr = new AttributeFamily();
-			        		ptr.setName("Name");
-			        		requestedAttributes.add(ptr);
-			        		ptr = new AttributeFamily();
-			        		ptr.setName("Email");
-			        		requestedAttributes.add(ptr);
-			        		ptr = new AttributeFamily();
-			        		ptr.setName("Tenant");
-			        		requestedAttributes.add(ptr);
-			        		ptr = new AttributeFamily();
-			        		ptr.setName("Role");
-			        		requestedAttributes.add(ptr);
+			        		List<AttributeFamily> requestedAttributes = new ArrayList<AttributeFamily>(4);
+			        		AttributeFamily email, role;
+			        		email = new AttributeFamily();
+			        		email.setName("Email");
+			        		requestedAttributes.add(email);
+			        		role = new AttributeFamily();
+			        		role.setName("Role");
+			        		requestedAttributes.add(role);
 			        		AttributeRequestHandler handler = new AttributeRequestHandler(requestedAttributes, subjectIdentifier, tenant);
 							String samlAttrRequest = handler.prepareResponse(null, handler.buildRequest());
 							/// Retrieve result of message
 							AttributeResponseHandler responseHandler = new AttributeResponseHandler(requestedAttributes);
-							String reply = send(samlAttrRequest); // Performs the actual request
+							String reply = send(tenant, samlAttrRequest); // Performs the actual request
 							Map<String, List<String>> attributes = responseHandler.interpret(reply);
 							for (String key : attributes.keySet()) {
 								List<String> next = attributes.get(key);
@@ -186,7 +131,6 @@ public class AuthenticationFlowController {
 			        			redirectURL = redirectURL + "&" + next;
 			        		else
 			        			redirectURL = redirectURL + "?" + next;
-			        	logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName() + ". Redirecting to " + redirectURL);
 			        	session.removeAttribute("RelayState");
 			        	session.setAttribute("Authenticated", true);
 			        	return "redirect:" + redirectURL;
@@ -227,68 +171,29 @@ public class AuthenticationFlowController {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process SAML response properly. Please retry and contact the administrator if this problem occurs again.");
 		        	return "report";
+				} catch (SAMLException e) {
+		        	logger.log(Level.SEVERE, e.getMessage(), e);  
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + e.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
+		        	return "report";
 				}
 	}
-
-	@RequestMapping(value = "/ServiceAccessServlet", method = RequestMethod.GET)
-	public String accessService(
-			@RequestParam(value = "RelayState", defaultValue = "") String relayState,
-			@RequestParam(value = "Tenant", defaultValue = "") String tenantIdentifier,
-			ModelMap model, HttpSession session) {
-		try {
-			if (session.getAttribute("Authenticated") == null || !((Boolean) session.getAttribute("Authenticated")).booleanValue()) {
-	            // RelayState
-	            if (relayState == null || relayState.isEmpty()) {
-	            	if (session.getAttribute("RelayState") == null)
-	            		throw new FlowException("Could not start authentication flow: no relay state given");
-	            	relayState = (String) session.getAttribute("RelayState");
-	            }
-	            session.setAttribute("RelayState", relayState);
-	            // Tenant Identifier
-	            Tenant tenantObject = null;
-	            if (session.getAttribute("Tenant") == null) {
-	            	if (tenantIdentifier == null || tenantIdentifier.isEmpty()) {
-	            		session.setAttribute("FlowRedirectionElement", new FlowDirecter("/ServiceAccessServlet"));
-	            		return "redirect:/";
-	            	} else {
-	            		tenantObject = this.tenantService.findOne(Long.parseLong(tenantIdentifier));
-	            		logger.log(Level.INFO, null, "Tenant: " + tenantObject.getName());
-	            	}
-	            } else {
-	            	tenantObject = (Tenant) session.getAttribute("Tenant");
-	            }
-	            if (tenantObject == null) {
-	        		session.setAttribute("FlowRedirectionElement", new FlowDirecter("/ServiceAccessServlet"));
-	        		return "redirect:/";
-	            } else {
-	            	session.setAttribute("Tenant", tenantObject);
-	            }
-	            // Redirect to next flow element
-	            return "redirect:/AuthenticationRequestServlet";
-			} else {
-				// Subject is already authenticated
-				if (relayState != null && !relayState.isEmpty())
-					session.setAttribute("RelayState", relayState);
-				return "redirect:/AuthenticationResponseServlet";
-			}
-        } catch (FlowException ex) {
-        	logger.log(Level.SEVERE, "Unable to process request", ex);
-            return "redirect:/";
-		}
-	} 
 	
-	@RequestMapping(value = "/LogoutServlet", method = RequestMethod.GET)
-	public String logout(
-			@RequestParam(value = "RelayState", defaultValue = "") String relayState,
-			ModelMap model, HttpSession session)  {
-		session.invalidate();
-		return "redirect:" + relayState;
-	}
-	
-	private String send(String samlAttrRequest) {
-		AttributeForwardImplService forwarder = new AttributeForwardImplService();
+	private String send(Tenant tenant, String samlAttrRequest) {
+		/*AttributeForwardImplService forwarder = new AttributeForwardImplService();
 		AttributeForwardService service = forwarder.getAttributeForwardImplPort();
-		return service.send(samlAttrRequest);
+		return service.send(samlAttrRequest);*/
+		try {
+			Client client = Client.create();
+			WebResource resource = client.resource(tenant.getAttrRequestEndpoint());
+			ClientResponse response = resource.queryParam("SAMLRequest", samlAttrRequest).post(ClientResponse.class);
+			if (response.getStatus() != 200)
+				throw new Exception("Could not contact the attribute service. Communication failure with " + tenant.getAttrRequestEndpoint() + " (HTTP error code " + response.getStatus() + ")");
+			String result = response.getEntity(String.class);
+			return result;
+		} catch (Exception e) {
+			logger.log(Level.WARNING, "Unable to obtain attributes", e);
+		}
+		return "";
 	}
 
 	private String removeTrailingSlash(String string) {

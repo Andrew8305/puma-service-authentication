@@ -4,7 +4,7 @@
  */
 package puma.sp.authentication.util.saml;
 
-import java.util.Set;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.servlet.http.HttpServletResponse;
@@ -17,6 +17,7 @@ import org.opensaml.xml.util.XMLHelper;
 import org.w3c.dom.Element;
 import puma.sp.mgmt.model.organization.Tenant;
 import puma.sp.mgmt.model.attribute.AttributeFamily;
+import puma.util.exceptions.SAMLException;
 import puma.util.saml.SAMLHelper;
 import puma.util.saml.elements.AttributeFactory;
 import puma.util.saml.elements.CustomProxyExtensionFactory;
@@ -34,9 +35,9 @@ public class AttributeRequestHandler extends AssertableHandler {
 	private static Logger logger = Logger.getLogger(AttributeRequestHandler.class.getCanonicalName());
     private Tenant tenant;
     private String subject;
-    private Set<AttributeFamily> attributes;
+    private List<AttributeFamily> attributes;
     
-    public AttributeRequestHandler(Set<AttributeFamily> attributes, String subject, Tenant requestingTenantParty) {
+    public AttributeRequestHandler(List<AttributeFamily> attributes, String subject, Tenant requestingTenantParty) throws SAMLException {
         super();
         this.tenant = requestingTenantParty;
         this.subject = subject;
@@ -44,7 +45,7 @@ public class AttributeRequestHandler extends AssertableHandler {
         SAMLHelper.initialize();
     }
     
-    public String prepareResponse(HttpServletResponse response, AttributeQuery unencodedSAMLRequest) throws MessageEncodingException {
+    public String prepareResponse(HttpServletResponse response, AttributeQuery unencodedSAMLRequest) throws MessageEncodingException, SAMLException {
             try {
                 // Add the extension to make the proxy recognize the next tenant
                 ExtensionsFactory factory = new ExtensionsFactory();
@@ -62,7 +63,7 @@ public class AttributeRequestHandler extends AssertableHandler {
     }
     
     
-    public AttributeQuery buildRequest() {
+    public AttributeQuery buildRequest() throws SAMLException {
         AttributeQueryFactory factory = new AttributeQueryFactory(this.getAssertionId(), (new SubjectFactory(this.subject)).produce(), this.tenant.getAttrRequestEndpoint(), (new IssuerFactory(AuthenticationRequestHandler.SP_NAME)).produce());
         for (AttributeFamily attribute: this.attributes) {
             factory.addFactory(new AttributeFactory(attribute.getName()));
