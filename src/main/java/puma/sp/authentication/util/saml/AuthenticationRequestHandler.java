@@ -23,7 +23,7 @@ import puma.util.saml.messages.AuthnRequestFactory;
  * @author jasper
  */
 public class AuthenticationRequestHandler extends AssertableHandler {
-    // MAYBE Make a properties file for this
+    // LATER Make a properties file for this
     public final static String SP_NAME = "PUMA Access Control Unit";
     public final static String SP_ASSERTION_SERVICE_CONSUMER_URL = "http://dnetcloud-tomcat:8080/authn/AuthenticationResponseServlet";
     
@@ -58,9 +58,9 @@ public class AuthenticationRequestHandler extends AssertableHandler {
         return this.tenant.getAuthnRequestEndpoint();
     }
     
-    public AuthnRequest buildRequest() throws SAMLException {
+    public AuthnRequest buildRequest(String proxyIdentifier) throws SAMLException {
         // Return the newly built authentication request
-        return this.constructAuthnRequest();
+        return this.constructAuthnRequest(proxyIdentifier);
     }
     
     public void prepareResponse(HttpServletResponse response, AuthnRequest unencodedSAMLRequest) throws MessageEncodingException {
@@ -83,11 +83,11 @@ public class AuthenticationRequestHandler extends AssertableHandler {
         encoder.encode(context);
     }
 
-    private AuthnRequest constructAuthnRequest() throws SAMLException {        
+    private AuthnRequest constructAuthnRequest(String proxyIdentifier) throws SAMLException {        
         SAMLHelper.initialize();
         AuthnRequest result = (new AuthnRequestFactory(this.getAssertionId(), this.redirectionLocation, AuthenticationRequestHandler.SP_NAME, AuthenticationRequestHandler.SP_ASSERTION_SERVICE_CONSUMER_URL)).produce();
         ExtensionsFactory factory = new ExtensionsFactory();
-        factory.addFactory((new CustomProxyExtensionFactory(this.tenant.toHierarchy())));
+        factory.addFactory((new CustomProxyExtensionFactory(proxyIdentifier)));
         result.setExtensions(factory.produce());
         return result;        
     }

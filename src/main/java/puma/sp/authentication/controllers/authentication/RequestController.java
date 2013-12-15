@@ -1,5 +1,6 @@
 package puma.sp.authentication.controllers.authentication;
 
+import java.io.IOException;
 import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,53 +39,72 @@ public class RequestController {
 	private SessionRequestService sessionService;
 
 	@RequestMapping(value = "/AuthenticationRequestServlet", method = RequestMethod.GET)
-	public String handleRequest(ModelMap model, HttpServletResponse response,
+	public void handleRequest(ModelMap model, HttpServletResponse response,
 			@RequestParam(value = "RelayState", defaultValue = "") String relayState,
 			@RequestParam(value = "Tenant", defaultValue = "") String tenantId, HttpSession session,
 			UriComponentsBuilder builder) {
-		Tenant tenant = null;		
+		Tenant tenant = null;
+		Boolean error = false;
 		try {
-			if (relayState == null || relayState.isEmpty())
-				relayState = (String) session.getAttribute("RelayState");
-			if (tenantId == null || tenantId.isEmpty())
-				tenant = (Tenant) session.getAttribute("Tenant");
-			else
-				tenant = tenantService.findOne(Long.parseLong(tenantId));
-			if (relayState == null)
-                throw new FlowException("No relay state was found in the authentication process");
-            if (tenant == null)
-            	throw new FlowException("No tenant could be identified in the authentication process");
-            
-            if (tenant.isAuthenticationLocallyManaged()) {
-            	logger.log(Level.INFO, "Receiving local authentication request for tenant " + tenant.getName() + ".");
-        		session.setAttribute("FlowRedirectionElement", new FlowDirecter("/AuthenticationResponseServlet"));
-        		return "/login";
-            } else {
-            	logger.log(Level.INFO, "Receiving remote authentication request for tenant " + tenant.getName() + ". Sending request to " + tenant.getAuthnRequestEndpoint() + " (or ancestor if null)");
-            	AuthenticationRequestHandler handler = new AuthenticationRequestHandler(relayState, tenant);
-                // Save the current session in a temporary DB and perform SAML request
-            	this.createSessionRequest(handler.getAssertionId(), relayState);
-            	handler.prepareResponse(response, handler.buildRequest());
-            }        	 
+			if (session.getAttribute("Authenticated") == null || !((Boolean) session.getAttribute("Authenticated")).booleanValue()) {
+				if (relayState == null || relayState.isEmpty())
+					relayState = (String) session.getAttribute("RelayState");
+				if (tenantId == null || tenantId.isEmpty())
+					tenant = (Tenant) session.getAttribute("Tenant");
+				else
+					tenant = tenantService.findOne(Long.parseLong(tenantId));
+				if (relayState == null)
+	                throw new FlowException("No relay state was found in the authentication process");
+	            if (tenant == null)
+	            	throw new FlowException("No tenant could be identified in the authentication process");
+	            
+	            if (tenant.isAuthenticationLocallyManaged()) {
+	            	logger.log(Level.INFO, "Receiving local authentication request for tenant " + tenant.getName() + ".");
+	        		session.setAttribute("FlowRedirectionElement", new FlowDirecter("/AuthenticationResponseServlet"));
+	        		response.sendRedirect(builder.path("/login").build().toString());
+	            } else {
+	            	logger.log(Level.INFO, "Receiving remote authentication request for tenant " + tenant.getName() + ". Sending request to " + tenant.getAuthnRequestEndpoint() + " (or ancestor if null)");
+	            	AuthenticationRequestHandler handler = new AuthenticationRequestHandler(relayState, tenant);
+	                // Save the current session in a temporary DB and perform SAML request
+	            	this.createSessionRequest(handler.getAssertionId(), relayState);
+	            	handler.prepareResponse(response, handler.buildRequest(tenant.getName()));
+	            }        	 
+			} else {
+				// Subject is already authenticated
+				if (relayState != null && !relayState.isEmpty())
+					session.setAttribute("RelayState", relayState);
+				logger.log(Level.INFO, "Got a request from an already authenticated user. Redirecting to response.");
+				response.sendRedirect(builder.path("/AuthenticationResponseServlet").build().toString());
+			}
         } catch (MessageEncodingException e) {  
+        	error = true;
         	logger.log(Level.SEVERE, e.getMessage(), e);
         	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not set up SAML message. Please retry and contact the administrator if this problem occurs again.");
-        	return "report";
         } catch (RequestConstructionException e) {
+        	error = true;
         	logger.log(Level.SEVERE, e.getMessage(), e);
         	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not set up SAML message. Please retry and contact the administrator if this problem occurs again.");
-        	return "report";
         } catch (FlowException e) {
+        	error = true;
         	logger.log(Level.SEVERE, e.getMessage(), e);  
         	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + e.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
-        	return "report";
 		} catch (SAMLException e) {
+        	error = true;
         	logger.log(Level.SEVERE, e.getMessage(), e);  
         	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + e.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
-        	return "report";
+		} catch (IOException e) {
+        	error = true;
+			logger.log(Level.SEVERE, e.getMessage(), e);  
+			MessageManager.getInstance().addMessage(session, "failure", "Could not redirect: " + e.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
 		}
-    	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process the request. Please retry and contact the administrator if this problem occurs again.");
-    	return "report";	
+		if (error) {
+	    	try {
+	    		//MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process the request. Please retry and contact the administrator if this problem occurs again.");
+	    		response.sendRedirect(builder.path("/error").build().toString());
+	    	} catch (IOException ex) {
+	    		logger.log(Level.SEVERE, "Could not redirect", ex);
+	    	}
+		}
 	}
    
     public void createSessionRequest(String assertionId, String relayState) {

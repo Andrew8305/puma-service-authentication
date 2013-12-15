@@ -50,29 +50,14 @@ public class MainController {
 	@RequestMapping(value = "/proc/wayf", method = RequestMethod.POST)
 	public String wayf(HttpSession session, @RequestParam("tenantId") Long tenantId) {
 		FlowDirecter directer = null;
-    	Tenant selectedTenant = this.retrieveTenant(tenantId);
+    	Tenant selectedTenant = this.tenantService.findOne(tenantId);
 		directer = (FlowDirecter) session.getAttribute("FlowRedirectionElement");
-		if (selectedTenant == null) {
-			directer = new FlowDirecter("/wayfError");
+		if (selectedTenant == null)
 			MessageManager.getInstance().addMessage(session, "info", "You will be authenticating as a free user");
-		}
-    	if (directer == null) {
-    		directer = new FlowDirecter("/login");
-    	}
-    	directer.addAttribute("Tenant", selectedTenant);
-    	session.setAttribute("Tenant", selectedTenant);
-    	logger.log(Level.INFO, "Selected tenant " + selectedTenant.getName() + "(" + ((Tenant) session.getAttribute("Tenant")).getId() + ") with flow direction " + directer.redirectionPage());
+    	if (directer == null)
+    		directer = new FlowDirecter("/SubmitWAYF");
+    	session.setAttribute("ChosenTenant", selectedTenant);
 		return directer.redirectionPage();
-	}
-	
-	private Tenant retrieveTenant(Long tenantId) {
-		Tenant result = this.tenantService.findOne(tenantId);
-		if (result == null)
-			if (tenantId == null)
-				logger.log(Level.WARNING, "No tenant found because given id has a NULL value");
-			else
-				logger.log(Level.WARNING, "No tenant found for id " + tenantId.toString() + " - does this tenant exist?");
-		return result;
 	}
 	
 	@RequestMapping(value = "/login", method = RequestMethod.GET)
@@ -101,12 +86,12 @@ public class MainController {
 			logger.log(Level.SEVERE, "Unable to evaluate password", e);
 			MessageManager.getInstance().addMessage(session, "failure", "Could not log in. Please contact your administrator. " + e.getLocalizedMessage());
 			model.addAttribute("msgs", MessageManager.getInstance().getMessages(session));
-			return "report";
+			return "redirect:/error";
 		} catch (InvalidKeySpecException e) {
 			logger.log(Level.SEVERE, "Unable to evaluate password", e);
 			MessageManager.getInstance().addMessage(session, "failure", "Could not log in. Please contact your administrator. " + e.getLocalizedMessage());
 			model.addAttribute("msgs", MessageManager.getInstance().getMessages(session));
-			return "report";
+			return "redirect:/error";
 		}
     	if (!PasswordHasher.equalHash(relevantUser.getPasswordHash(), theHash)) {
 			String tenantName = "NULL";
@@ -124,5 +109,12 @@ public class MainController {
     	directer.addAttribute("SubjectIdentifier", relevantUser.getId().toString());
     	session.setAttribute("SubjectIdentifier", relevantUser.getId().toString());
 		return directer.redirectionPage();
+	}
+	
+	@RequestMapping(value = "/error", method = RequestMethod.GET) 
+	public String report(ModelMap model, HttpSession session) {
+		model.addAttribute("msgs",
+			MessageManager.getInstance().getMessages(session));
+		return "report";
 	}
 }

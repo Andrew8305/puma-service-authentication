@@ -53,37 +53,42 @@ public class ResponseController {
 			@RequestParam(value = "Tenant", defaultValue = "") String tenantId,
 			HttpSession session, UriComponentsBuilder builder, HttpServletRequest request) {
 				try {
-		        	User subject = null;
-		        	String subjectIdentifier;
-		        	Tenant tenant;
-		        	if (tenantId.isEmpty())
-		        		 tenant = (Tenant) session.getAttribute("Tenant");
-		        	else
-		        		 tenant = this.tenantService.findOne(Long.parseLong(tenantId));
-		        	if (relayState.isEmpty())
-		        		relayState = (String) session.getAttribute("RelayState");
-		        	if (tenant == null) {
-		            	throw new FlowException("No tenant could be identified in the authentication process");
-		            }
-		        	if (relayState == null) {
-		        		throw new FlowException("No relay state could be found in the authentication process");
-		        	}
-		        	// Retrieve the identifier for the current subject
-		        	if (tenant.isAuthenticationLocallyManaged()) {
-		        		subjectIdentifier = (String) session.getAttribute("SubjectIdentifier");
-		        		if (subjectIdentifier == null || subjectIdentifier.isEmpty())
-		        			throw new FlowException("Could not identify the user: null pointer or empty identifier found");
-		        	} else {
-		        		AuthenticationResponseHandler handler = new AuthenticationResponseHandler();
-		        		String redirectionAddress = handler.interpret(this.sessionService, request);
-		        		if (!redirectionAddress.equalsIgnoreCase((String) session.getAttribute("RelayState")))
-		        			throw new FlowException("Illegal relay state modification in the process");
-		        		subjectIdentifier = handler.getSubject(request);
-		        		if (subjectIdentifier == null || subjectIdentifier.isEmpty())
-		        			throw new FlowException("Could not identify the user: null pointer or empty identifier found");
-		        		session.setAttribute("SubjectIdentifier", subjectIdentifier);
-		        		logger.log(Level.INFO, "Completed request for subject " + subjectIdentifier + " from tenant " + tenant.getName() + " succesfully. Performing attribute lookup.");
-		        	}
+					User subject = null;
+					String subjectIdentifier;
+					Tenant tenant;
+					if (tenantId.isEmpty())
+						tenant = (Tenant) session.getAttribute("Tenant");
+					else
+						tenant = this.tenantService.findOne(Long.parseLong(tenantId));
+					if (relayState.isEmpty())
+						relayState = (String) session.getAttribute("RelayState");
+					if (tenant == null) {
+						throw new FlowException("No tenant could be identified in the authentication process");
+					}
+					if (relayState == null) {
+						throw new FlowException("No relay state could be found in the authentication process");
+					}
+					if (session.getAttribute("Authenticated") == null || !((Boolean) session.getAttribute("Authenticated")).booleanValue()) {
+			        	// Retrieve the identifier for the current subject
+			        	if (tenant.isAuthenticationLocallyManaged()) {
+			        		subjectIdentifier = (String) session.getAttribute("SubjectIdentifier");
+			        		if (subjectIdentifier == null || subjectIdentifier.isEmpty())
+			        			throw new FlowException("Could not identify the user: null pointer or empty identifier found");
+			        	} else {
+			        		AuthenticationResponseHandler handler = new AuthenticationResponseHandler();
+			        		String redirectionAddress = handler.interpret(this.sessionService, request);
+			        		if (!redirectionAddress.equalsIgnoreCase((String) session.getAttribute("RelayState")))
+			        			throw new FlowException("Illegal relay state modification in the process");
+			        		subjectIdentifier = handler.getSubject(request);
+			        		if (subjectIdentifier == null || subjectIdentifier.isEmpty())
+			        			throw new FlowException("Could not identify the user: null pointer or empty identifier found");
+			        		session.setAttribute("SubjectIdentifier", subjectIdentifier);
+			        		logger.log(Level.INFO, "Completed request for subject " + subjectIdentifier + " from tenant " + tenant.getName() + " succesfully. Performing attribute lookup.");
+			        	}
+					} else {
+						// Subject is already authenticated
+						subjectIdentifier = (String) session.getAttribute("SubjectIdentifier");
+					}
 		        	// Process response
 		        	if (relayState != null && !relayState.isEmpty() && !relayState.equalsIgnoreCase(AccessController.DEFAULT_RELAYSTATE)) {
 			        	// If a relay state was given, redirect back to the relay state, include the alias
@@ -125,6 +130,7 @@ public class ResponseController {
 								for (String nextValue: next)
 									parameters.add(new String(key + "=" + nextValue));
 							}
+							parameters.add("Name=" + subjectIdentifier);
 			        	}
 			        	for (String next: parameters)
 			        		if (redirectURL.indexOf("?") >= 0)
@@ -137,44 +143,44 @@ public class ResponseController {
 		        	} else {
 		        		// if no relay state was given, show an info page that the user has now an active session and can access services that use this authentication service as a verifier
 		        		MessageManager.getInstance().addMessage(session, "success", "You have successfully logged in. You can now use any of the applications that use this service as an authentication service.");
-		        		return "report";
+		        		return "redirect:/error";
 		        	}
 		        } catch (MessageDecodingException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
-		        	return "report";
+		        	return "redirect:/error";
 		        } catch (org.opensaml.xml.security.SecurityException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
-		        	return "report";
+		        	return "redirect:/error";
 		        } catch (ResponseProcessingException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process the SAML response. Please retry and contact the administrator if this problem occurs again.");
-		        	return "report";
+		        	return "redirect:/error";
 		        } catch (FlowException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + ex.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
-		        	return "report";
+		        	return "redirect:/error";
 		        } catch (NumberFormatException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
-		        	return "report";
+		        	return "redirect:/error";
 				} catch (MessageEncodingException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
-		        	return "report";
+		        	return "redirect:/error";
 				} catch (ServiceParameterException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process SAML response properly. Please retry and contact the administrator if this problem occurs again.");
-		        	return "report";
+		        	return "redirect:/error";
 				} catch (ElementProcessingException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Could not process SAML response properly. Please retry and contact the administrator if this problem occurs again.");
-		        	return "report";
-				} catch (SAMLException e) {
-		        	logger.log(Level.SEVERE, e.getMessage(), e);  
-		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + e.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
-		        	return "report";
+		        	return "redirect:/error";
+				} catch (SAMLException ex) {
+		        	logger.log(Level.SEVERE, "Unable to process request", ex);  
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + ex.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
+		        	return "redirect:/error";
 				}
 	}
 	

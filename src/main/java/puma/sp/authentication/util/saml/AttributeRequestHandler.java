@@ -5,8 +5,6 @@
 package puma.sp.authentication.util.saml;
 
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.servlet.http.HttpServletResponse;
 import org.opensaml.saml2.core.AttributeQuery;
 import org.opensaml.saml2.core.impl.AttributeQueryMarshaller;
@@ -32,7 +30,6 @@ import puma.util.saml.messages.AttributeQueryFactory;
  * @author jasper
  */
 public class AttributeRequestHandler extends AssertableHandler {
-	private static Logger logger = Logger.getLogger(AttributeRequestHandler.class.getCanonicalName());
     private Tenant tenant;
     private String subject;
     private List<AttributeFamily> attributes;
@@ -57,8 +54,7 @@ public class AttributeRequestHandler extends AssertableHandler {
                 // Return result
                 return XMLHelper.prettyPrintXML(query);                
             } catch (MarshallingException ex) {
-            	logger.log(Level.SEVERE, "Could not prepare response", ex);
-                return null;
+                throw new SAMLException(ex);
             }            
     }
     
