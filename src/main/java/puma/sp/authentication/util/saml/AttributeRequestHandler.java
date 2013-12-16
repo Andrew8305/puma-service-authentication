@@ -42,11 +42,11 @@ public class AttributeRequestHandler extends AssertableHandler {
         SAMLHelper.initialize();
     }
     
-    public String prepareResponse(HttpServletResponse response, AttributeQuery unencodedSAMLRequest) throws MessageEncodingException, SAMLException {
+    public String prepareResponse(HttpServletResponse response, AttributeQuery unencodedSAMLRequest, String proxyIdentifier) throws MessageEncodingException, SAMLException {
             try {
                 // Add the extension to make the proxy recognize the next tenant
                 ExtensionsFactory factory = new ExtensionsFactory();
-                factory.addFactory((new CustomProxyExtensionFactory(this.tenant.toHierarchy())));
+                factory.addFactory((new CustomProxyExtensionFactory(proxyIdentifier)));
                 unencodedSAMLRequest.setExtensions(factory.produce());
                 // Marshall the message
                 Marshaller marshaller = new AttributeQueryMarshaller();

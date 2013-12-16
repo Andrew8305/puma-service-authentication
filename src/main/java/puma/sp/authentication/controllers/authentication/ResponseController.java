@@ -120,7 +120,7 @@ public class ResponseController {
 			        		role.setName("Role");
 			        		requestedAttributes.add(role);
 			        		AttributeRequestHandler handler = new AttributeRequestHandler(requestedAttributes, subjectIdentifier, tenant);
-							String samlAttrRequest = handler.prepareResponse(null, handler.buildRequest());
+							String samlAttrRequest = handler.prepareResponse(null, handler.buildRequest(), tenant.getName());
 							/// Retrieve result of message
 							AttributeResponseHandler responseHandler = new AttributeResponseHandler(requestedAttributes);
 							String reply = send(tenant, samlAttrRequest); // Performs the actual request
