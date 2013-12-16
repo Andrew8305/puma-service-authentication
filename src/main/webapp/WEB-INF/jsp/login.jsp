@@ -15,7 +15,7 @@
   <form:form method="post" class="form-signin" action="proc/login">
     <input type="text" class="form-control" placeholder="Loginname" name="loginName" id="loginName" required autofocus>
     <input type="password" class="form-control" placeholder="Password" name="password" id="password" required>
-    <button class="btn btn-lg btn-primary btn-block" type="submit">Log in</button>
+    <button class="btn btn-lg btn-danger btn-block" type="submit">Log in</button>
   </form:form>
 </div>
 

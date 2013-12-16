@@ -17,6 +17,9 @@
 	rel="stylesheet" media="screen" />
 <link href="<c:url value="/resources/css/navbar-fixed-top.css"/>"
 	rel="stylesheet" />
+<!-- Own style adjustments -->
+<link href="<c:url value="/resources/css/own-style.css"/>"
+	rel="stylesheet" media="screen" />
 
 <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
 <!--[if lt IE 9]>
