@@ -6,28 +6,18 @@
 
 <div class="container">
 	<c:if test="${!empty tenants}">
-		<div class="row">
-			<div class="span8 offset2">
-				<h1>Tenants</h1>
-				<form:form method="post" role="form" commandName="tenant" class="form-horizontal" action="proc/wayf">
-					<div class="control-group">
-						<form:label cssClass="control-label" path="id">Choose tenant:</form:label>
-						<div class="controls">
-							<select name="tenantId" class="form-control">
-								<c:forEach items="${tenants}" var="tenant">
-									<option value="${tenant.id}">${tenant.name}</option>
-								</c:forEach>
-							</select>
-						</div>
-					</div>
-					<div class="control-group">
-						<div class="controls">
-							<input type="submit" value="Submit" class="btn" />
-						</div>
-					</div>
-				</form:form>
+		<form:form method="post" role="form" commandName="tenant"
+			class="form-wayf" action="proc/wayf">
+			<h2 class="form-wayf-heading">Choose tenant</h2>
+			<div class="form-group">
+			<select name="tenantId" class="form-control">
+				<c:forEach items="${tenants}" var="tenant">
+					<option value="${tenant.id}">${tenant.name}</option>
+				</c:forEach>
+			</select>
 			</div>
-		</div>
+			<input type="submit" value="Submit" class="btn btn-primary btn-lg btn-block" />
+		</form:form>
 	</c:if>
 	<c:if test="${empty tenants}">
 		<p>Could not find any tenants to redirect to!</p>

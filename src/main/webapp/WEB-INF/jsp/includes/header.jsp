@@ -36,7 +36,7 @@
 				<span class="icon-bar"></span> <span class="icon-bar"></span> <span
 					class="icon-bar"></span>
 			</button>
-			<a class="navbar-brand" href="#">PUMA</a>
+			<a class="navbar-brand" href="#">PUMA Authentication Service</a>
 		</div>
 		<!--/.nav-collapse -->
 	</div>
