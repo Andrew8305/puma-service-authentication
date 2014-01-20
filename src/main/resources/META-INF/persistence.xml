@@ -10,6 +10,7 @@
 		<class>puma.sp.mgmt.model.attribute.DataType</class>
 		<class>puma.sp.mgmt.model.attribute.Multiplicity</class>
 		<class>puma.sp.mgmt.model.user.User</class>
+		<class>puma.sp.mgmt.model.user.Group</class>
 		<class>puma.sp.mgmt.model.user.SessionRequest</class>
 		<class>puma.sp.mgmt.model.organization.Tenant</class>
 		<class>puma.sp.mgmt.model.organization.TenantMgmtType</class>
