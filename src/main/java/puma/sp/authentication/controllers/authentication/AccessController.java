@@ -29,7 +29,9 @@ public class AccessController {
 	public String accessService(
 			@RequestParam(value = "RelayState", defaultValue = "") String relayState,
 			@RequestParam(value = "Tenant", defaultValue = "") String tenantIdentifier,
+			@RequestParam(value = "Post", defaultValue = "false") Boolean post, 
 			ModelMap model, HttpSession session) {
+    	session.setAttribute("Post", post);
 		if (session.getAttribute("Authenticated") == null || !((Boolean) session.getAttribute("Authenticated")).booleanValue()) {
 			session.removeAttribute("Tenant");
 			// Ensure relay state is in place

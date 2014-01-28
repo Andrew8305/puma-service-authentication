@@ -41,11 +41,14 @@ public class RequestController {
 	@RequestMapping(value = "/AuthenticationRequestServlet", method = RequestMethod.GET)
 	public void handleRequest(ModelMap model, HttpServletResponse response,
 			@RequestParam(value = "RelayState", defaultValue = "") String relayState,
-			@RequestParam(value = "Tenant", defaultValue = "") String tenantId, HttpSession session,
+			@RequestParam(value = "Tenant", defaultValue = "") String tenantId,
+			@RequestParam(value = "Post", defaultValue = "false") Boolean post, HttpSession session,
 			UriComponentsBuilder builder) {
 		Tenant tenant = null;
 		Boolean error = false;
 		try {
+			if (session.getAttribute("Post") != null)
+				post = (Boolean) session.getAttribute("Post");
 			if (session.getAttribute("Authenticated") == null || !((Boolean) session.getAttribute("Authenticated")).booleanValue()) {
 				if (relayState == null || relayState.isEmpty())
 					relayState = (String) session.getAttribute("RelayState");
