@@ -119,7 +119,7 @@ public class ResponseController {
 				        	model.addAttribute("role", roles);
 				        	return "submit";
 			        	} else {
-			        		return "redirect:" + relayState + "?UserId=" + subjectIdentifier + "&Token=" + generateToken() + roleString;
+			        		return "redirect:" + relayState + "?UserId=" + subjectIdentifier + "&Tenant=" + tenant.getId() + "&Token=" + generateToken() + roleString;
 			        	}
 		        	} else {
 		        		// if no relay state was given, show an info page that the user has now an active session and can access services that use this authentication service as a verifier
