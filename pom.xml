@@ -63,23 +63,23 @@
 			<version>1.2</version>
 		</dependency>
 
-		<dependency>
-			<groupId>org.springframework.data</groupId>
-			<artifactId>spring-data-jpa</artifactId>
-			<version>1.4.2.RELEASE</version>
-		</dependency>
+<!-- 		<dependency> -->
+<!-- 			<groupId>org.springframework.data</groupId> -->
+<!-- 			<artifactId>spring-data-jpa</artifactId> -->
+<!-- 			<version>1.4.2.RELEASE</version> -->
+<!-- 		</dependency> -->
 
-		<dependency>
-			<groupId>org.hibernate.javax.persistence</groupId>
-			<artifactId>hibernate-jpa-2.0-api</artifactId>
-			<version>1.0.0.Final</version>
-		</dependency>
+<!-- 		<dependency> -->
+<!-- 			<groupId>org.hibernate.javax.persistence</groupId> -->
+<!-- 			<artifactId>hibernate-jpa-2.0-api</artifactId> -->
+<!-- 			<version>1.0.0.Final</version> -->
+<!-- 		</dependency> -->
 
-		<dependency>
-			<groupId>org.hibernate</groupId>
-			<artifactId>hibernate-entitymanager</artifactId>
-			<version>3.6.10.Final</version>
-		</dependency>
+<!-- 		<dependency> -->
+<!-- 			<groupId>org.hibernate</groupId> -->
+<!-- 			<artifactId>hibernate-entitymanager</artifactId> -->
+<!-- 			<version>3.6.10.Final</version> -->
+<!-- 		</dependency> -->
 
 		<dependency>
 			<groupId>org.hsqldb</groupId>
@@ -150,7 +150,7 @@
 		<groupId>org.codehaus.mojo</groupId>
 		<artifactId>tomcat-maven-plugin</artifactId>
 		<configuration>
-			<url>http://dnetcloud-tomcat:8080/manager/text</url>
+			<url>http://sis3s-puma:8080/manager/text</url>
 			<server>mytomcat</server>
 			<path>/authn</path>
 		</configuration>
