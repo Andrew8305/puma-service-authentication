@@ -79,7 +79,7 @@ public class MainController {
 			return "redirect:/login";
 		}
 		// else: check password
-		byte[] theHash;
+		/*byte[] theHash;
 		try {
 			theHash = PasswordHasher.getHashValue(password, relevantUser.getPasswordSalt());
 		} catch (NoSuchAlgorithmException e) {
@@ -100,7 +100,18 @@ public class MainController {
 			logger.log(Level.INFO, "User authentication error: password provided for login name \"" + userName + "\" and tenant \"" + tenantName + "\" did not match locally stored hash. Authentication failed");
 			MessageManager.getInstance().addMessage(session, "failure", "Authentication failed! Please try again");
 			return "redirect:/login";    		
-    	}
+    	}*/
+		if (password == null)
+			password = "";
+		if (!password.equals(relevantUser.getPassword())) {
+			String tenantName = "NULL";
+			if (tenant != null)
+				tenantName = tenant.getName();
+			logger.log(Level.INFO, "User authentication error: password provided for login name \"" + userName + "\" and tenant \"" + tenantName + "\" did not match locally stored hash. Authentication failed");
+			MessageManager.getInstance().addMessage(session, "failure", "Authentication failed! Please try again");
+			return "redirect:/login";    		
+		}
+			
     	// else: back to flow
     	FlowDirecter directer = (FlowDirecter) session.getAttribute("FlowRedirectionElement");
     	if (directer == null) {

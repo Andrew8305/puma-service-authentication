@@ -19,6 +19,7 @@ import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 import puma.sp.authentication.messages.MessageManager;
 import puma.sp.authentication.util.saml.AuthenticationResponseHandler;
+import puma.sp.mgmt.model.attribute.Attribute;
 import puma.sp.mgmt.model.organization.Tenant;
 import puma.sp.mgmt.model.user.User;
 import puma.sp.mgmt.repositories.organization.TenantService;
@@ -93,10 +94,17 @@ public class ResponseController {
 			        	if (subjectIdentifier == null || subjectIdentifier.isEmpty())
 			        		throw new ResponseProcessingException("Could not find a user with null or empty subject identifier. If this problem persists, please ask your administrator to inspect the logs.");
 			        	parameters.add(new String("UserId=" + subjectIdentifier));
+			        	// collect attributes
+			        	List<String> roles = new ArrayList<String>();
+			        	String roleString = "";
 			        	if (tenant.isAuthenticationLocallyManaged()) {
 			        		subject = this.userService.byId(Long.parseLong(subjectIdentifier));
 			        		if (subject == null)
 			        			throw new ResponseProcessingException("Could not find a user with identifier " + subjectIdentifier);
+			        		for (Attribute next: subject.getAttribute("Roles")) {
+			        			roles.add(next.getValue());
+			        			roleString = roleString + "&Roles=" + next.getValue();
+			        		}
 					        logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName() + ". Redirecting to " + redirectURL);
 			        	} else {
 			        	}
@@ -108,9 +116,10 @@ public class ResponseController {
 				        	model.addAttribute("relayState", relayState);
 				        	model.addAttribute("userId", subjectIdentifier);
 				        	model.addAttribute("token", generateToken());
+				        	model.addAttribute("role", roles);
 				        	return "submit";
 			        	} else {
-			        		return "redirect:" + relayState + "?UserId=" + subjectIdentifier + "&Token=" + generateToken();
+			        		return "redirect:" + relayState + "?UserId=" + subjectIdentifier + "&Token=" + generateToken() + roleString;
 			        	}
 		        	} else {
 		        		// if no relay state was given, show an info page that the user has now an active session and can access services that use this authentication service as a verifier
