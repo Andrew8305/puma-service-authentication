@@ -31,6 +31,14 @@
 		    <property name="hibernate.connection.password" value="root"/>
 			<property name="hibernate.archive.autodetection" value="class, hbm"/>
 			<property name="hibernate.hbm2ddl.auto" value="update" />
+			<property name="hibernate.c3p0.acquire_increment" value="1" />
+			<property name="hibernate.c3p0.min_size" value="5" />
+			<property name="hibernate.c3p0.max_size" value="20" />
+			<property name="hibernate.c3p0.timeout" value="5000" />
+			<property name="hibernate.c3p0.max_statements" value="100" />
+			<property name="hibernate.c3p0.idle_test_period" value="3000" />
+			<property name="hibernate.c3p0.testConnectionOnCheckout" value="true" />
+			<property name="hibernate.c3p0.acquireRetryAttempts" value="1" />
 			
 		</properties>
 	</persistence-unit>
