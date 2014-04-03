@@ -101,7 +101,11 @@ public class ResponseController {
 			        	if (subjectIdentifier == null || subjectIdentifier.isEmpty())
 			        		throw new ResponseProcessingException("Could not find a user with null or empty subject identifier. If this problem persists, please ask your administrator to inspect the logs.");
 			        	parameters.add(new String("UserId=" + subjectIdentifier.trim()));
-			        	parameters.add(new String("Tenant=" + tenant.getId().toString().trim()));
+			        	Tenant current = tenant;
+			        	while (current != null) {
+			        		parameters.add(new String("Tenant=" + current.getId().toString().trim()));
+			        		current = current.getSuperTenant();
+			        	}
 			        	// collect attributes
 			        	if (tenant.isAuthenticationLocallyManaged()) {
 			        		subject = this.userService.byId(Long.parseLong(subjectIdentifier));
