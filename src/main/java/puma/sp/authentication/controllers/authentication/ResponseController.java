@@ -2,11 +2,13 @@ package puma.sp.authentication.controllers.authentication;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import org.opensaml.ws.message.decoder.MessageDecodingException;
+import org.opensaml.ws.message.encoder.MessageEncodingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
@@ -18,8 +20,11 @@ import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 import puma.sp.authentication.messages.MessageManager;
+import puma.sp.authentication.util.saml.AttributeRequestHandler;
+import puma.sp.authentication.util.saml.AttributeResponseHandler;
 import puma.sp.authentication.util.saml.AuthenticationResponseHandler;
 import puma.sp.mgmt.model.attribute.Attribute;
+import puma.sp.mgmt.model.attribute.AttributeFamily;
 import puma.sp.mgmt.model.organization.Tenant;
 import puma.sp.mgmt.model.user.User;
 import puma.sp.mgmt.repositories.organization.TenantService;
@@ -29,6 +34,8 @@ import puma.util.SecureIdentifierGenerator;
 import puma.util.exceptions.SAMLException;
 import puma.util.exceptions.flow.FlowException;
 import puma.util.exceptions.flow.ResponseProcessingException;
+import puma.util.exceptions.saml.ElementProcessingException;
+import puma.util.exceptions.saml.ServiceParameterException;
 
 @Controller
 public class ResponseController {
@@ -90,36 +97,67 @@ public class ResponseController {
 		        	if (relayState != null && !relayState.isEmpty() && !relayState.equalsIgnoreCase(AccessController.DEFAULT_RELAYSTATE)) {
 			        	// If a relay state was given, redirect back to the relay state, include the alias
 			        	String redirectURL = removeTrailingSlash(new String(relayState));
-			        	List<String> parameters = new ArrayList<String>();
+			        	List<String> parameters = new ArrayList<String>();	// NOTE Parameters currently only work for GET-operations
 			        	if (subjectIdentifier == null || subjectIdentifier.isEmpty())
 			        		throw new ResponseProcessingException("Could not find a user with null or empty subject identifier. If this problem persists, please ask your administrator to inspect the logs.");
-			        	parameters.add(new String("UserId=" + subjectIdentifier));
+			        	parameters.add(new String("UserId=" + subjectIdentifier.trim()));
+			        	parameters.add(new String("Tenant=" + tenant.getId().toString().trim()));
 			        	// collect attributes
-			        	List<String> roles = new ArrayList<String>();
-			        	String roleString = "";
 			        	if (tenant.isAuthenticationLocallyManaged()) {
 			        		subject = this.userService.byId(Long.parseLong(subjectIdentifier));
 			        		if (subject == null)
 			        			throw new ResponseProcessingException("Could not find a user with identifier " + subjectIdentifier);
-			        		for (Attribute next: subject.getAttribute("Roles")) {
-			        			roles.add(next.getValue());
-			        			roleString = roleString + "&Roles=" + next.getValue();
-			        		}
+			        		for (Attribute next: subject.getAttribute("Roles"))
+			        			parameters.add(new String("Role=" + next.getValue().trim()));
+			        		if (!subject.getAttribute("Name").isEmpty())
+			        			parameters.add(new String("Name=" + subject.getAttribute("Name").get(0).getValue().toString().trim()));
+			        		else
+			        			parameters.add(new String("Name=" + subject.getLoginName()).trim());
+			        		if (!subject.getAttribute("E-Mail").isEmpty())
+			        			parameters.add(new String("Email=" + subject.getAttribute("E-Mail").get(0).getValue()).trim());
 					        logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName() + ". Redirecting to " + redirectURL);
 			        	} else {
+                            List<AttributeFamily> requestedAttributes = new ArrayList<AttributeFamily>(4);
+                            AttributeFamily email, role, name;
+                            name = new AttributeFamily();
+                            name.setName("Name");
+                            requestedAttributes.add(name);
+                            email = new AttributeFamily();
+                            email.setName("Email");
+                            requestedAttributes.add(email);
+                            role = new AttributeFamily();
+                            role.setName("Role");
+                            requestedAttributes.add(role);
+                            AttributeRequestHandler handler = new AttributeRequestHandler(requestedAttributes, subjectIdentifier, tenant);
+                            String samlAttrRequest = handler.prepareResponse(null, handler.buildRequest(), tenant.toHierarchy());
+                            /// Retrieve result of message
+                            AttributeResponseHandler responseHandler = new AttributeResponseHandler(requestedAttributes);
+                            String reply = send(tenant, samlAttrRequest); // Performs the actual request
+                            Map<String, List<String>> attributes = responseHandler.interpret(reply);
+                            for (String key : attributes.keySet()) {
+                            	List<String> next = attributes.get(key);
+                                for (String nextValue: next)
+                                	parameters.add(new String(key + "=" + nextValue));
+                            }
 			        	}
 			        	session.removeAttribute("RelayState");
 			        	session.removeAttribute("Post");
 			        	session.setAttribute("Authenticated", true);
 
 			        	if (post) {
+			        		// Not fully supported
 				        	model.addAttribute("relayState", relayState);
 				        	model.addAttribute("userId", subjectIdentifier);
 				        	model.addAttribute("token", generateToken());
-				        	model.addAttribute("role", roles);
+				        	model.addAttribute("role", null); //TODO
 				        	return "submit";
 			        	} else {
-			        		return "redirect:" + relayState + "?UserId=" + subjectIdentifier + "&Tenant=" + tenant.getId() + "&Token=" + generateToken() + roleString;
+			        		String respString = new String("");
+			        		for (String next: parameters)
+			        			respString = respString + "&" + next.trim();
+			        		respString = respString.substring(1);
+			        		logger.info("Sending response with content " + respString);
+			        		return "redirect:" + relayState + "?" + respString + "&Token=" + generateToken();
 			        	}
 		        	} else {
 		        		// if no relay state was given, show an info page that the user has now an active session and can access services that use this authentication service as a verifier
@@ -150,6 +188,18 @@ public class ResponseController {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);  
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + ex.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
 		        	return "redirect:/error";
+				} catch (MessageEncodingException ex) {
+		        	logger.log(Level.SEVERE, "Unable to process request", ex);
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
+		        	return "redirect:/error";
+				} catch (ServiceParameterException ex) {
+		        	logger.log(Level.SEVERE, "Unable to process request", ex);
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
+		        	return "redirect:/error";
+				} catch (ElementProcessingException ex) {
+		        	logger.log(Level.SEVERE, "Unable to process request", ex);
+		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
+		        	return "redirect:/error";
 				}
 	}
 
@@ -157,7 +207,6 @@ public class ResponseController {
 		return SecureIdentifierGenerator.generate();
 	}
 
-	@SuppressWarnings("unused")
 	private String send(Tenant tenant, String samlAttrRequest) {
 		/*AttributeForwardImplService forwarder = new AttributeForwardImplService();
 		AttributeForwardService service = forwarder.getAttributeForwardImplPort();
