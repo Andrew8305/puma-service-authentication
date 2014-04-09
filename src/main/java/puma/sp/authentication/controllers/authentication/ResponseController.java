@@ -25,8 +25,10 @@ import puma.sp.authentication.util.saml.AttributeResponseHandler;
 import puma.sp.authentication.util.saml.AuthenticationResponseHandler;
 import puma.sp.mgmt.model.attribute.Attribute;
 import puma.sp.mgmt.model.attribute.AttributeFamily;
+import puma.sp.mgmt.model.attribute.RetrievalStrategy;
 import puma.sp.mgmt.model.organization.Tenant;
 import puma.sp.mgmt.model.user.User;
+import puma.sp.mgmt.repositories.attribute.AttributeFamilyService;
 import puma.sp.mgmt.repositories.organization.TenantService;
 import puma.sp.mgmt.repositories.user.SessionRequestService;
 import puma.sp.mgmt.repositories.user.UserService;
@@ -47,6 +49,8 @@ public class ResponseController {
 	private UserService userService;
 	@Autowired
 	private SessionRequestService sessionService;
+	@Autowired
+	private AttributeFamilyService familyService;
 	
 	@RequestMapping(value = "/AuthenticationResponseServlet", method = RequestMethod.GET)
 	public String handleResponse(ModelMap model, 
@@ -112,14 +116,19 @@ public class ResponseController {
 			        		subject = this.userService.byId(Long.parseLong(subjectIdentifier));
 			        		if (subject == null)
 			        			throw new ResponseProcessingException("Could not find a user with identifier " + subjectIdentifier);
-			        		for (Attribute next: subject.getAttribute("Roles"))
+			        		/*for (Attribute next: subject.getAttribute("Roles"))
 			        			parameters.add(new String("Role=" + next.getValue().trim()));
 			        		if (!subject.getAttribute("Name").isEmpty())
 			        			parameters.add(new String("Name=" + subject.getAttribute("Name").get(0).getValue().toString().trim()));
 			        		else
 			        			parameters.add(new String("Name=" + subject.getLoginName()).trim());
 			        		if (!subject.getAttribute("E-Mail").isEmpty())
-			        			parameters.add(new String("Email=" + subject.getAttribute("E-Mail").get(0).getValue()).trim());
+			        			parameters.add(new String("Email=" + subject.getAttribute("E-Mail").get(0).getValue()).trim());*/			        		
+			        		for (AttributeFamily nextF: familyService.findAllOrganizationProvider(tenant))
+			        			if (nextF.getRetrievalStrategy().equals(RetrievalStrategy.PUSH))
+			        				for (Attribute next: subject.getAttribute(nextF.getName()))
+			        					parameters.add(new String(nextF.getName()) + "=" + next.getValue().trim());
+			        		
 					        logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName() + ". Redirecting to " + redirectURL);
 			        	} else {
                             List<AttributeFamily> requestedAttributes = new ArrayList<AttributeFamily>(4);
