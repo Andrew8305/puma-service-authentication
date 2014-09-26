@@ -24,8 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
+
 import org.opensaml.ws.message.decoder.MessageDecodingException;
 import org.opensaml.ws.message.encoder.MessageEncodingException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,9 +37,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
+
 import puma.sp.authentication.messages.MessageManager;
 import puma.sp.authentication.util.saml.AttributeRequestHandler;
 import puma.sp.authentication.util.saml.AttributeResponseHandler;
@@ -52,6 +58,7 @@ import puma.sp.mgmt.repositories.organization.TenantService;
 import puma.sp.mgmt.repositories.user.SessionRequestService;
 import puma.sp.mgmt.repositories.user.UserService;
 import puma.util.SecureIdentifierGenerator;
+import puma.util.attributes.AttributeJSON;
 import puma.util.exceptions.SAMLException;
 import puma.util.exceptions.flow.FlowException;
 import puma.util.exceptions.flow.ResponseProcessingException;
@@ -123,13 +130,20 @@ public class ResponseController {
 			        	List<String> parameters = new ArrayList<String>();	// NOTE Parameters currently only work for GET-operations
 			        	if (subjectIdentifier == null || subjectIdentifier.isEmpty())
 			        		throw new ResponseProcessingException("Could not find a user with null or empty subject identifier. If this problem persists, please ask your administrator to inspect the logs.");
-			        	parameters.add(new String("UserId=" + subjectIdentifier.trim()));			        	
-			        	parameters.add(new String("PrimaryTenant=" + tenant.getId().toString().trim()));
+			        	String userId = subjectIdentifier.trim();			        	
+			        	String primaryTenant = tenant.getId().toString().trim();
 			        	Tenant current = tenant;
+			        	
+			        	String jsonString = "";
+			        	
+			        	StringBuilder tenants = new StringBuilder();
 			        	while (current != null) {
-			        		parameters.add(new String("Tenant=" + current.getId().toString().trim()));
+			        		if(tenants.length() != 0)
+			        			tenants.append(',');
+			        		tenants.append(current.getId().toString().trim());
 			        		current = current.getSuperTenant();
 			        	}
+			        	
 			        	// collect attributes
 			        	if (tenant.isAuthenticationLocallyManaged()) {
 			        		subject = this.userService.byId(Long.parseLong(subjectIdentifier));
@@ -142,12 +156,23 @@ public class ResponseController {
 			        		else
 			        			parameters.add(new String("Name=" + subject.getLoginName()).trim());
 			        		if (!subject.getAttribute("E-Mail").isEmpty())
-			        			parameters.add(new String("Email=" + subject.getAttribute("E-Mail").get(0).getValue()).trim());*/			        		
-			        		for (AttributeFamily nextF: familyService.findAllOrganizationProvider(tenant))
-			        			if (nextF.getRetrievalStrategy().equals(RetrievalStrategy.PUSH))
-			        				for (Attribute next: subject.getAttribute(nextF.getName()))
-			        					parameters.add(new String(nextF.getName()) + "=" + next.getValue().trim());
+			        			parameters.add(new String("Email=" + subject.getAttribute("E-Mail").get(0).getValue()).trim());*/
 			        		
+			        		List<AttributeJSON> attributes = new ArrayList<AttributeJSON>();
+			        		for (AttributeFamily nextF: familyService.findAllOrganizationProvider(tenant))
+			        			if (nextF.getRetrievalStrategy().equals(RetrievalStrategy.PUSH)) {
+			        				List<String> values = new ArrayList<String>();
+			        				for (Attribute next: subject.getAttribute(nextF.getName()))
+			        					values.add(next.getValue());
+			        				attributes.add(new AttributeJSON(nextF.getXacmlIdentifier(), values, nextF.getMultiplicity().name(), nextF.getDataType().name()));
+			        			}
+			        		
+			        		ObjectMapper mapper = new ObjectMapper();
+			        		try {
+								jsonString = mapper.writeValueAsString(attributes);
+							} catch (JsonProcessingException e) {
+								logger.log(Level.SEVERE, "Failure while writing the attributes to a JSON string");
+							}
 					        logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName() + ". Redirecting to " + redirectURL);
 			        	} else {
                             List<AttributeFamily> requestedAttributes = new ArrayList<AttributeFamily>(4);
@@ -167,6 +192,8 @@ public class ResponseController {
                             AttributeResponseHandler responseHandler = new AttributeResponseHandler(requestedAttributes);
                             String reply = send(tenant, samlAttrRequest); // Performs the actual request
                             Map<String, List<String>> attributes = responseHandler.interpret(reply);
+                            
+                            //FIXME use jsonString instead of deprecated parameters (or remove/rewrite this altogether)
                             for (String key : attributes.keySet()) {
                             	List<String> next = attributes.get(key);
                                 for (String nextValue: next)
@@ -177,21 +204,27 @@ public class ResponseController {
 			        	session.removeAttribute("Post");
 			        	session.setAttribute("Authenticated", true);
 
-			        	if (post) {
-			        		// Not fully supported
+			        	//if (post) {                     FIXME post anyway...
+			        		// Not fully supported --> now it is
 				        	model.addAttribute("relayState", relayState);
-				        	model.addAttribute("userId", subjectIdentifier);
+				        	model.addAttribute("primaryTenant", primaryTenant);
+				        	model.addAttribute("userId", userId);
+				        	model.addAttribute("attributes", jsonString);
 				        	model.addAttribute("token", generateToken());
-				        	model.addAttribute("role", null); //TODO
+				        	model.addAttribute("tenant", tenants);
+				        	//model.addAttribute("role", null); //TODO
+				        	logger.info("Attributes JSON document: \n" + jsonString);
 				        	return "submit";
-			        	} else {
+			        /*	} else {
 			        		String respString = new String("");
 			        		for (String next: parameters)
 			        			respString = respString + "&" + next.trim();
 			        		respString = respString.substring(1);
 			        		logger.info("Sending response with content " + respString);
-			        		return "redirect:" + relayState + "?" + respString + "&Token=" + generateToken();
-			        	}
+			        		logger.info("Attributes JSON document: \n" + jsonString);
+			        		model.addAttribute("attributes", respString);
+			        		return "redirect:" + relayState + "?" + respString + "&attributes=" + jsonString + &Token=" + generateToken();
+			        	}*/
 		        	} else {
 		        		// if no relay state was given, show an info page that the user has now an active session and can access services that use this authentication service as a verifier
 		        		MessageManager.getInstance().addMessage(session, "success", "You have successfully logged in. You can now use any of the applications that use this service as an authentication service.");
