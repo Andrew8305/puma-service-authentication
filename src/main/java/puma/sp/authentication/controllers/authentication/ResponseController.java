@@ -175,7 +175,9 @@ public class ResponseController {
 							}
 					        logger.log(Level.INFO, "Authentication completed for " + subject.getLoginName() + ". Redirecting to " + redirectURL);
 			        	} else {
-                            List<AttributeFamily> requestedAttributes = new ArrayList<AttributeFamily>(4);
+			        		throw new UnsupportedOperationException("The `!tenant.isAuthenticationLocallyManaged()` case is not yet implemented in ResponseController");
+			        		
+                            /*List<AttributeFamily> requestedAttributes = new ArrayList<AttributeFamily>(4);
                             AttributeFamily email, role, name;
                             name = new AttributeFamily();
                             name.setName("Name");
@@ -198,7 +200,7 @@ public class ResponseController {
                             	List<String> next = attributes.get(key);
                                 for (String nextValue: next)
                                 	parameters.add(new String(key + "=" + nextValue));
-                            }
+                            }*/
 			        	}
 			        	session.removeAttribute("RelayState");
 			        	session.removeAttribute("Post");
@@ -254,7 +256,7 @@ public class ResponseController {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);  
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. " + ex.getMessage() + " Please retry and contact the administrator if this problem occurs again.");
 		        	return "redirect:/error";
-				} catch (MessageEncodingException ex) {
+				} /*catch (MessageEncodingException ex) {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
 		        	return "redirect:/error";
@@ -266,7 +268,7 @@ public class ResponseController {
 		        	logger.log(Level.SEVERE, "Unable to process request", ex);
 		        	MessageManager.getInstance().addMessage(session, "failure", "Failed to process the authentication process. Please retry and contact the administrator if this problem occurs again.");
 		        	return "redirect:/error";
-				}
+				}*/
 	}
 
 	private String generateToken() {
