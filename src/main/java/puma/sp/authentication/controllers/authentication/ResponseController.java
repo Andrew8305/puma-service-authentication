@@ -214,6 +214,7 @@ public class ResponseController {
 				        	model.addAttribute("attributes", jsonString);
 				        	model.addAttribute("token", generateToken());
 				        	model.addAttribute("tenant", tenants);
+				        	model.addAttribute("policyLang", tenant.getPolicyLanguage().name());
 				        	//model.addAttribute("role", null); //TODO
 				        	logger.info("Attributes JSON document: \n" + jsonString);
 				        	return "submit";

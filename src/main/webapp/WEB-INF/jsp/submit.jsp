@@ -9,6 +9,7 @@
 			<input type="hidden" id="Tenant" name="Tenant" value="${tenant}">
 			<input type="hidden" id="Token" name="Token" value="${token}">
 			<input type="hidden" id="attributes" name="attributes" value='${attributes}'>
+			<input type="hidden" id="policyLang" name="policyLang" value='${policyLang}'>
 		</form>
 		
 		<script>
