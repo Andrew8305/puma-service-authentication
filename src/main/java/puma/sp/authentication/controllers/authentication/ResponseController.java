@@ -50,6 +50,7 @@ import puma.sp.authentication.util.saml.AttributeResponseHandler;
 import puma.sp.authentication.util.saml.AuthenticationResponseHandler;
 import puma.sp.mgmt.model.attribute.Attribute;
 import puma.sp.mgmt.model.attribute.AttributeFamily;
+import puma.sp.mgmt.model.attribute.Multiplicity;
 import puma.sp.mgmt.model.attribute.RetrievalStrategy;
 import puma.sp.mgmt.model.organization.Tenant;
 import puma.sp.mgmt.model.user.User;
@@ -164,7 +165,8 @@ public class ResponseController {
 			        				List<String> values = new ArrayList<String>();
 			        				for (Attribute next: subject.getAttribute(nextF.getName()))
 			        					values.add(next.getValue());
-			        				attributes.add(new AttributeJSON(nextF.getXacmlIdentifier(), values, nextF.getMultiplicity().name(), nextF.getDataType().name()));
+			        				if( !(nextF.getMultiplicity() == Multiplicity.ATOMIC && values.isEmpty()) )
+			        					attributes.add(new AttributeJSON(nextF.getXacmlIdentifier(), values, nextF.getMultiplicity().name(), nextF.getDataType().name()));
 			        			}
 			        		
 			        		ObjectMapper mapper = new ObjectMapper();
